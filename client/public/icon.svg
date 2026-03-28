@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2000 2000" width="2000" height="2000">
+  <!-- Background -->
+  <rect width="2000" height="2000" fill="#0a0a0a"/>
+  <!-- M glyph — geometric, filled, white -->
+  <polygon points="310.00,310.00 446.00,310.00 1068.00,1110.40 1554.00,310.00 1690.00,310.00 1690.00,1690.00 1554.00,1690.00 1554.00,452.80 1000.00,1253.20 446.00,452.80 446.00,1690.00 310.00,1690.00" fill="#ffffff"/>
+</svg>
