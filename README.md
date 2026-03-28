@@ -14,10 +14,6 @@
 [![Self-hosted](https://img.shields.io/badge/Self--hosted-your%20server-111?style=for-the-badge)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=for-the-badge)](https://github.com/paulfxyz/mercury/pulls)
 
-<a href="https://demo.mercury.sh">
-  <img src="https://paulfleury.com/github/mercury.png" alt="Mercury — Expert Inquiry Engine" width="700" />
-</a>
-
 **[demo.mercury.sh](https://demo.mercury.sh)** · **[mercury.sh](https://mercury.sh)**
 
 </div>
