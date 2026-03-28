@@ -1,0 +1,198 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Mercury Design System ─────────────────────────────── */
+:root {
+  /* Background & Surface — deep dark, like late-night research */
+  --background: 222 20% 7%;
+  --foreground: 210 20% 88%;
+
+  --card: 222 18% 10%;
+  --card-foreground: 210 20% 88%;
+
+  --popover: 222 18% 10%;
+  --popover-foreground: 210 20% 88%;
+
+  /* Primary — electric indigo-blue, the "signal" color */
+  --primary: 226 80% 62%;
+  --primary-foreground: 222 20% 7%;
+
+  --secondary: 222 16% 16%;
+  --secondary-foreground: 210 20% 70%;
+
+  --muted: 222 16% 14%;
+  --muted-foreground: 215 12% 52%;
+
+  --accent: 226 60% 58%;
+  --accent-foreground: 222 20% 7%;
+
+  --destructive: 0 70% 55%;
+  --destructive-foreground: 210 20% 95%;
+
+  --border: 222 15% 18%;
+  --input: 222 15% 14%;
+  --ring: 226 80% 62%;
+
+  --radius: 0.5rem;
+
+  /* Mercury custom tokens */
+  --mercury-glow: 226 80% 62%;
+  --mercury-amber: 38 90% 55%;
+  --mercury-success: 160 60% 45%;
+  --mercury-warning: 38 90% 55%;
+  --mercury-error: 0 70% 55%;
+
+  --font-display: 'Cabinet Grotesk', 'Inter', sans-serif;
+  --font-body: 'Satoshi', 'Inter', sans-serif;
+}
+
+/* ─── Base Reset ────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100dvh;
+  font-family: var(--font-body);
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  line-height: 1.2;
+}
+
+/* ─── Mercury-specific utilities ────────────────────────── */
+.mercury-glow {
+  box-shadow: 0 0 24px hsl(var(--mercury-glow) / 0.25), 0 0 0 1px hsl(var(--mercury-glow) / 0.15);
+}
+
+.mercury-glow-text {
+  color: hsl(var(--primary));
+  text-shadow: 0 0 20px hsl(var(--primary) / 0.4);
+}
+
+/* Animated gradient border for active elements */
+.gradient-border {
+  position: relative;
+  background: hsl(var(--card));
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.6), hsl(238 80% 72% / 0.3), hsl(var(--primary) / 0.6));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ─── Scrollbar ─────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: hsl(var(--background)); }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+
+/* ─── Focus ─────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─── Prose for final answer ────────────────────────────── */
+.prose-mercury {
+  font-family: var(--font-body);
+  line-height: 1.8;
+  color: hsl(var(--foreground));
+}
+
+.prose-mercury h1, .prose-mercury h2, .prose-mercury h3 {
+  font-family: var(--font-display);
+  color: hsl(var(--foreground));
+  margin: 1.5em 0 0.5em;
+  font-weight: 700;
+}
+
+.prose-mercury h1 { font-size: 1.6rem; }
+.prose-mercury h2 { font-size: 1.3rem; color: hsl(var(--primary)); }
+.prose-mercury h3 { font-size: 1.1rem; }
+
+.prose-mercury p { margin: 0.75em 0; }
+.prose-mercury ul, .prose-mercury ol { padding-left: 1.5em; margin: 0.75em 0; }
+.prose-mercury li { margin: 0.25em 0; }
+
+.prose-mercury strong { color: hsl(var(--foreground)); font-weight: 700; }
+.prose-mercury em { color: hsl(var(--foreground) / 0.8); }
+
+.prose-mercury code {
+  background: hsl(var(--muted));
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.prose-mercury blockquote {
+  border-left: 3px solid hsl(var(--primary));
+  padding-left: 1em;
+  color: hsl(var(--foreground) / 0.7);
+  font-style: italic;
+  margin: 1em 0;
+}
+
+/* ─── Iteration card animations ─────────────────────────── */
+@keyframes slide-in-from-bottom {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-in {
+  animation: slide-in-from-bottom 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Pulse for running iteration */
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4); }
+  70% { box-shadow: 0 0 0 8px hsl(var(--primary) / 0); }
+  100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Shimmer for skeleton loaders */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--border)) 50%, hsl(var(--muted)) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+/* ─── Model badge colors ────────────────────────────────── */
+.model-anthropic { background: hsl(25 80% 55% / 0.15); color: hsl(25 80% 65%); border-color: hsl(25 80% 55% / 0.3); }
+.model-openai { background: hsl(152 60% 45% / 0.15); color: hsl(152 60% 55%); border-color: hsl(152 60% 45% / 0.3); }
+.model-google { background: hsl(210 80% 55% / 0.15); color: hsl(210 80% 65%); border-color: hsl(210 80% 55% / 0.3); }
+.model-meta { background: hsl(220 70% 55% / 0.15); color: hsl(220 70% 65%); border-color: hsl(220 70% 55% / 0.3); }
+.model-mistral { background: hsl(280 70% 55% / 0.15); color: hsl(280 70% 65%); border-color: hsl(280 70% 55% / 0.3); }
+.model-deepseek { background: hsl(196 80% 50% / 0.15); color: hsl(196 80% 60%); border-color: hsl(196 80% 50% / 0.3); }
+.model-qwen { background: hsl(340 70% 55% / 0.15); color: hsl(340 70% 65%); border-color: hsl(340 70% 55% / 0.3); }
+.model-default { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); border-color: hsl(var(--border)); }
