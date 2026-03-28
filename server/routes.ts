@@ -3,52 +3,45 @@ import type { Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { runOrchestration, fetchOpenRouterModels } from "./orchestrator";
-import { randomUUID } from "crypto";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
 
-const upload = multer({
-  dest: "uploads/",
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
-});
+const upload = multer({ dest: "uploads/", limits: { fileSize: 20 * 1024 * 1024 } });
 
-// Active WebSocket connections per session
 const sessionClients = new Map<string, Set<WebSocket>>();
-
 function broadcast(sessionId: string, data: Record<string, unknown>) {
   const clients = sessionClients.get(sessionId);
   if (!clients) return;
   const msg = JSON.stringify(data);
-  for (const ws of clients) {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(msg);
-    }
-  }
+  clients.forEach(ws => {
+    if (ws.readyState === WebSocket.OPEN) ws.send(msg);
+  });
 }
 
 export function registerRoutes(httpServer: Server, app: Express) {
-  // WebSocket setup
+  // ─── WebSocket ──────────────────────────────────────────
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
-
   wss.on("connection", (ws, req) => {
-    const url = new URL(req.url!, `http://localhost`);
+    const url = new URL(req.url!, "http://localhost");
     const sessionId = url.searchParams.get("sessionId");
-
     if (sessionId) {
       if (!sessionClients.has(sessionId)) sessionClients.set(sessionId, new Set());
       sessionClients.get(sessionId)!.add(ws);
-
-      ws.on("close", () => {
-        sessionClients.get(sessionId)?.delete(ws);
-      });
+      ws.on("close", () => sessionClients.get(sessionId)?.delete(ws));
     }
   });
 
-  // ─── Settings ──────────────────────────────────────────────
-  app.get("/api/settings", (req, res) => {
+  // ─── Onboarding ─────────────────────────────────────────
+  app.get("/api/onboarding", (_req, res) => {
     const apiKey = storage.getSetting("openrouter_api_key")?.value ?? "";
-    res.json({ apiKey: apiKey ? "***configured***" : "" });
+    const wfList = storage.listWorkflows();
+    res.json({ hasApiKey: !!apiKey, hasWorkflow: wfList.length > 0 });
+  });
+
+  // ─── Settings ───────────────────────────────────────────
+  app.get("/api/settings", (_req, res) => {
+    const apiKey = storage.getSetting("openrouter_api_key")?.value ?? "";
+    const theme = storage.getSetting("theme")?.value ?? "light";
+    res.json({ apiKey: apiKey ? "***configured***" : "", theme });
   });
 
   app.post("/api/settings", (req, res) => {
@@ -58,11 +51,22 @@ export function registerRoutes(httpServer: Server, app: Express) {
     res.json({ success: true });
   });
 
-  // ─── Models ────────────────────────────────────────────────
-  app.get("/api/models", async (req, res) => {
+  app.get("/api/settings/theme", (_req, res) => {
+    const theme = storage.getSetting("theme")?.value ?? "light";
+    res.json({ theme });
+  });
+
+  app.post("/api/settings/theme", (req, res) => {
+    const { theme } = req.body;
+    if (theme !== "light" && theme !== "dark") return res.status(400).json({ error: "invalid theme" });
+    storage.setSetting("theme", theme);
+    res.json({ success: true, theme });
+  });
+
+  // ─── Models ─────────────────────────────────────────────
+  app.get("/api/models", async (_req, res) => {
     const apiKey = storage.getSetting("openrouter_api_key")?.value;
     if (!apiKey) return res.status(401).json({ error: "API key not configured" });
-
     try {
       const models = await fetchOpenRouterModels(apiKey);
       res.json(models);
@@ -71,15 +75,58 @@ export function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // ─── Sessions ──────────────────────────────────────────────
-  app.get("/api/sessions", (req, res) => {
-    res.json(storage.listSessions());
+  // ─── Workflows ──────────────────────────────────────────
+  app.get("/api/workflows", (_req, res) => res.json(storage.listWorkflows()));
+
+  app.get("/api/workflows/:id", (req, res) => {
+    const wf = storage.getWorkflow(req.params.id);
+    if (!wf) return res.status(404).json({ error: "Not found" });
+    res.json(wf);
   });
 
+  app.post("/api/workflows", (req, res) => {
+    const { name, description, steps, iterations: iters, isDefault } = req.body;
+    if (!name) return res.status(400).json({ error: "name required" });
+    const wf = storage.createWorkflow({
+      name,
+      description: description ?? "",
+      steps: typeof steps === "string" ? steps : JSON.stringify(steps ?? []),
+      iterations: iters ?? 15,
+      isDefault: isDefault ? 1 : 0,
+    });
+    res.json(wf);
+  });
+
+  app.put("/api/workflows/:id", (req, res) => {
+    const { name, description, steps, iterations: iters, isDefault } = req.body;
+    const patch: Record<string, unknown> = {};
+    if (name !== undefined) patch.name = name;
+    if (description !== undefined) patch.description = description;
+    if (steps !== undefined) patch.steps = typeof steps === "string" ? steps : JSON.stringify(steps);
+    if (iters !== undefined) patch.iterations = iters;
+    if (isDefault !== undefined) patch.isDefault = isDefault ? 1 : 0;
+    const wf = storage.updateWorkflow(req.params.id, patch as any);
+    if (!wf) return res.status(404).json({ error: "Not found" });
+    res.json(wf);
+  });
+
+  app.delete("/api/workflows/:id", (req, res) => {
+    storage.deleteWorkflow(req.params.id);
+    res.json({ success: true });
+  });
+
+  // ─── Sessions ───────────────────────────────────────────
+  app.get("/api/sessions", (_req, res) => res.json(storage.listSessions()));
+
   app.get("/api/sessions/:id", (req, res) => {
-    const session = storage.getSession(req.params.id);
-    if (!session) return res.status(404).json({ error: "Not found" });
-    res.json(session);
+    const s = storage.getSession(req.params.id);
+    if (!s) return res.status(404).json({ error: "Not found" });
+    res.json(s);
+  });
+
+  app.delete("/api/sessions", (_req, res) => {
+    storage.deleteAllSessions();
+    res.json({ success: true });
   });
 
   app.delete("/api/sessions/:id", (req, res) => {
@@ -87,31 +134,22 @@ export function registerRoutes(httpServer: Server, app: Express) {
     res.json({ success: true });
   });
 
-  // ─── Iterations ───────────────────────────────────────────
   app.get("/api/sessions/:id/iterations", (req, res) => {
-    const iters = storage.getIterationsBySession(req.params.id);
-    res.json(iters);
+    res.json(storage.getIterationsBySession(req.params.id));
   });
 
-  // ─── File Upload ──────────────────────────────────────────
+  // ─── File Upload ────────────────────────────────────────
   app.post("/api/upload", upload.array("files", 5), (req, res) => {
     const files = (req.files as Express.Multer.File[]) ?? [];
-    const fileInfo = files.map((f) => ({
-      name: f.originalname,
-      size: f.size,
-      path: f.path,
-    }));
-    res.json({ files: fileInfo });
+    res.json({ files: files.map((f) => ({ name: f.originalname, size: f.size })) });
   });
 
-  // ─── Start Research Session ────────────────────────────────
+  // ─── Research ───────────────────────────────────────────
   app.post("/api/research", async (req, res) => {
-    const { query, selectedModels, iterations: iterCount = 15, title } = req.body;
-
-    if (!query || !selectedModels || selectedModels.length === 0) {
+    const { query, selectedModels, iterations: iterCount = 15, title, workflowId } = req.body;
+    if (!query || !selectedModels?.length) {
       return res.status(400).json({ error: "query and selectedModels required" });
     }
-
     const apiKey = storage.getSetting("openrouter_api_key")?.value;
     if (!apiKey) return res.status(401).json({ error: "API key not configured" });
 
@@ -124,21 +162,15 @@ export function registerRoutes(httpServer: Server, app: Express) {
       currentIteration: 0,
       totalIterations: iterCount,
       finalAnswer: null,
+      workflowId: workflowId ?? null,
     });
 
     res.json({ sessionId: session.id });
 
-    // Run orchestration in background
     setImmediate(async () => {
       try {
-        await runOrchestration(
-          session.id,
-          query,
-          selectedModels,
-          iterCount,
-          apiKey,
-          (update) => broadcast(session.id, update)
-        );
+        await runOrchestration(session.id, query, selectedModels, iterCount, apiKey,
+          (update) => broadcast(session.id, update));
       } catch (e) {
         storage.updateSession(session.id, { status: "error" });
         broadcast(session.id, { type: "error", message: String(e) });

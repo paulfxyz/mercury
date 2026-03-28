@@ -2,46 +2,59 @@ import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Sessions table
+// ─── Sessions ────────────────────────────────────────────────
 export const sessions = sqliteTable("sessions", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),
   query: text("query").notNull(),
-  files: text("files").notNull().default("[]"), // JSON array of file names
-  selectedModels: text("selected_models").notNull().default("[]"), // JSON array
+  files: text("files").notNull().default("[]"),
+  selectedModels: text("selected_models").notNull().default("[]"),
   status: text("status").notNull().default("pending"), // pending | running | completed | error
   currentIteration: integer("current_iteration").notNull().default(0),
   totalIterations: integer("total_iterations").notNull().default(15),
   finalAnswer: text("final_answer"),
+  workflowId: text("workflow_id"),
   createdAt: integer("created_at").notNull(),
 });
-
 export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true, createdAt: true });
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type Session = typeof sessions.$inferSelect;
 
-// Iterations table
+// ─── Iterations ──────────────────────────────────────────────
 export const iterations = sqliteTable("iterations", {
   id: text("id").primaryKey(),
   sessionId: text("session_id").notNull(),
   iterationNumber: integer("iteration_number").notNull(),
   type: text("type").notNull(), // research | debate | vote | synthesis | final
-  content: text("content").notNull(), // JSON with model responses
+  content: text("content").notNull(),
   summary: text("summary"),
-  consensus: real("consensus"), // 0-1 agreement score
+  consensus: real("consensus"),
   createdAt: integer("created_at").notNull(),
 });
-
 export const insertIterationSchema = createInsertSchema(iterations).omit({ id: true, createdAt: true });
 export type InsertIteration = z.infer<typeof insertIterationSchema>;
 export type Iteration = typeof iterations.$inferSelect;
 
-// API Key settings
+// ─── Settings ────────────────────────────────────────────────
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
 });
-
 export const insertSettingSchema = createInsertSchema(settings);
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
 export type Setting = typeof settings.$inferSelect;
+
+// ─── Workflows ───────────────────────────────────────────────
+export const workflows = sqliteTable("workflows", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  // JSON array of { modelId, label, systemPrompt }
+  steps: text("steps").notNull().default("[]"),
+  iterations: integer("iterations").notNull().default(15),
+  isDefault: integer("is_default").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+});
+export const insertWorkflowSchema = createInsertSchema(workflows).omit({ id: true, createdAt: true });
+export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;
+export type Workflow = typeof workflows.$inferSelect;

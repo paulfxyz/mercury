@@ -1,117 +1,138 @@
 import { Link, useLocation } from "wouter";
-import { Settings, MessageSquare, Plus, ChevronRight, Beaker } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import type { Session } from "@shared/schema";
+import { useTheme } from "@/App";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  MessageSquare, GitBranch, Settings, Sun, Moon, Plus, Clock, Trash2
+} from "lucide-react";
+import type { Session } from "@shared/schema";
 
-interface LayoutProps {
-  children: React.ReactNode;
+// Mercury wordmark
+function MercuryLogo({ collapsed }: { collapsed: boolean }) {
+  return (
+    <div className={cn("flex items-center gap-2.5 font-semibold text-foreground select-none", collapsed && "justify-center")}>
+      <span className="text-xl leading-none flex-shrink-0">☿</span>
+      {!collapsed && <span className="text-sm tracking-tight">Mercury</span>}
+    </div>
+  );
 }
 
-export default function Layout({ children }: LayoutProps) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const { theme, toggle } = useTheme();
 
-  const { data: sessions } = useQuery<Session[]>({
+  const { data: sessions = [] } = useQuery<Session[]>({
     queryKey: ["/api/sessions"],
-    refetchInterval: 5000,
+    staleTime: 5_000,
   });
 
-  return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-64 flex-shrink-0 flex flex-col border-r border-border bg-card">
-        {/* Logo */}
-        <div className="px-5 py-4 border-b border-border flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-            <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-primary">
-              <circle cx="12" cy="12" r="3" fill="currentColor" />
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" stroke="currentColor" strokeWidth="1.5" opacity="0.4"/>
-              <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.6"/>
-              <path d="M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.4"/>
-            </svg>
-          </div>
-          <div>
-            <div className="font-display font-800 text-sm tracking-tight text-foreground">MERCURY</div>
-            <div className="text-[10px] text-muted-foreground font-mono tracking-widest">DEEP RESEARCH</div>
-          </div>
-        </div>
+  const recentSessions = sessions.slice(0, 8);
 
-        {/* New Research CTA */}
-        <div className="p-3">
-          <Link href="/">
+  const navLink = (href: string, icon: React.ReactNode, label: string) => {
+    const active = location === href || (href === "/chat" && location === "/");
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Link href={href}>
             <button
-              data-testid="btn-new-research"
+              data-testid={`nav-${label.toLowerCase()}`}
               className={cn(
-                "w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
-                location === "/"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary/60 text-foreground hover:bg-secondary"
+                "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
+                active
+                  ? "bg-accent text-accent-foreground font-medium"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
               )}
             >
-              <Plus className="w-4 h-4" />
-              New Research
+              <span className="flex-shrink-0">{icon}</span>
+              <span className="truncate">{label}</span>
             </button>
           </Link>
-        </div>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="hidden">{label}</TooltipContent>
+      </Tooltip>
+    );
+  };
 
-        {/* Recent Sessions */}
-        <div className="flex-1 overflow-y-auto px-2">
-          {sessions && sessions.length > 0 && (
-            <div className="mb-2">
-              <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                Recent
+  return (
+    <TooltipProvider delayDuration={300}>
+      <div className="flex h-screen bg-background overflow-hidden">
+        {/* Sidebar */}
+        <aside className="flex flex-col w-56 flex-shrink-0 border-r border-border bg-sidebar">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 h-14 border-b border-sidebar-border">
+            <MercuryLogo collapsed={false} />
+          </div>
+
+          {/* Primary nav */}
+          <div className="p-2 space-y-0.5">
+            <Link href="/chat">
+              <button
+                data-testid="nav-new-research"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+              >
+                <Plus className="w-4 h-4 flex-shrink-0" />
+                New Research
+              </button>
+            </Link>
+          </div>
+
+          <div className="px-2 space-y-0.5">
+            {navLink("/chat", <MessageSquare className="w-4 h-4" />, "Chat")}
+            {navLink("/workflows", <GitBranch className="w-4 h-4" />, "Workflows")}
+            {navLink("/settings", <Settings className="w-4 h-4" />, "Settings")}
+          </div>
+
+          {/* Recent sessions */}
+          {recentSessions.length > 0 && (
+            <div className="px-2 mt-4 flex-1 overflow-hidden flex flex-col min-h-0">
+              <p className="px-3 pb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Recent</p>
+              <div className="overflow-y-auto flex-1 space-y-0.5 pr-1">
+                {recentSessions.map((s) => (
+                  <Link key={s.id} href={`/session/${s.id}`}>
+                    <button
+                      data-testid={`session-link-${s.id}`}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-left transition-colors group",
+                        location === `/session/${s.id}`
+                          ? "bg-accent text-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+                      )}
+                    >
+                      <Clock className="w-3 h-3 flex-shrink-0 opacity-50" />
+                      <span className="text-xs truncate flex-1">{s.title}</span>
+                      <span className={cn(
+                        "w-1.5 h-1.5 rounded-full flex-shrink-0",
+                        s.status === "completed" ? "bg-green-500" :
+                        s.status === "running" ? "bg-amber-500 animate-pulse" :
+                        s.status === "error" ? "bg-red-500" : "bg-muted-foreground/40"
+                      )} />
+                    </button>
+                  </Link>
+                ))}
               </div>
-              {sessions.slice(0, 20).map((session) => (
-                <Link key={session.id} href={`/session/${session.id}`}>
-                  <button
-                    data-testid={`session-link-${session.id}`}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-all group",
-                      location === `/session/${session.id}`
-                        ? "bg-secondary text-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                    )}
-                  >
-                    <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className="truncate flex-1">{session.title}</span>
-                    <span className={cn(
-                      "w-1.5 h-1.5 rounded-full flex-shrink-0",
-                      session.status === "running" && "bg-amber-500 animate-pulse",
-                      session.status === "completed" && "bg-emerald-500",
-                      session.status === "error" && "bg-red-500",
-                      session.status === "pending" && "bg-muted-foreground",
-                    )} />
-                  </button>
-                </Link>
-              ))}
             </div>
           )}
-        </div>
 
-        {/* Bottom nav */}
-        <div className="p-3 border-t border-border space-y-1">
-          <Link href="/settings">
+          {/* Footer: theme toggle */}
+          <div className="p-2 border-t border-sidebar-border mt-auto">
             <button
-              data-testid="btn-settings"
-              className={cn(
-                "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all",
-                location === "/settings"
-                  ? "bg-secondary text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-              )}
+              data-testid="btn-theme-toggle"
+              onClick={toggle}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
             >
-              <Settings className="w-4 h-4" />
-              Settings
+              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>
             </button>
-          </Link>
-        </div>
-      </aside>
+          </div>
+        </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-hidden">
-        {children}
-      </main>
-    </div>
+        {/* Main content */}
+        <main className="flex-1 overflow-hidden flex flex-col min-w-0">
+          {children}
+        </main>
+      </div>
+    </TooltipProvider>
   );
 }

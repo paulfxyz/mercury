@@ -1,17 +1,16 @@
-import { useLocation } from "wouter";
+import { Link } from "wouter";
 
 export default function NotFound() {
-  const [, navigate] = useLocation();
   return (
-    <div className="h-screen flex flex-col items-center justify-center gap-4 bg-background text-foreground">
-      <div className="text-6xl font-display font-900 text-primary/20">404</div>
-      <div className="text-lg font-semibold">Page not found</div>
-      <button
-        onClick={() => navigate("/")}
-        className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-all"
-      >
-        Back to Mercury
-      </button>
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 p-6">
+      <span className="text-4xl select-none">☿</span>
+      <h1 className="text-lg font-semibold text-foreground">Page not found</h1>
+      <p className="text-sm text-muted-foreground">The page you're looking for doesn't exist.</p>
+      <Link href="/chat">
+        <a className="text-sm text-foreground underline underline-offset-2 hover:opacity-70 transition-opacity">
+          Go to chat
+        </a>
+      </Link>
     </div>
   );
 }
