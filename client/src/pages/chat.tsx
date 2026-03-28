@@ -540,22 +540,24 @@ function QuickAnswerBanner({
     <div className="border border-border rounded-xl overflow-hidden bg-card animate-fade-in-up">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
         <Zap className="w-3.5 h-3.5 text-amber-500" />
-        <span className="text-xs font-semibold text-foreground">Quick Answer</span>
-        <span className="text-xs text-muted-foreground ml-1">— Detected as a straightforward inquiry</span>
+        <span className="text-xs font-semibold text-foreground">Initial answer</span>
+        <span className="text-xs text-muted-foreground ml-1">— Want to make sure? Run the expert debate.</span>
       </div>
       {loading ? (
-        <div className="px-4 py-6 flex items-center justify-center gap-2">
+        <div className="px-4 py-6 flex items-center justify-center gap-2 gap-3">
           <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Thinking…</span>
+          <span className="text-sm text-muted-foreground">Getting an initial answer…</span>
         </div>
       ) : (
         <div className="px-4 py-4 space-y-4">
           <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{answer}</p>
           <div className="flex gap-2">
-            <Button size="sm" onClick={onAccept} className="flex-1">Accept answer</Button>
-            <Button size="sm" variant="outline" onClick={onDebate} className="flex-1">
+            <Button size="sm" onClick={onDebate} className="flex-1">
               <GitBranch className="w-3.5 h-3.5 mr-1.5" />
-              Run expert debate anyway
+              Run expert debate
+            </Button>
+            <Button size="sm" variant="outline" onClick={onAccept} className="flex-1 text-muted-foreground">
+              Accept &amp; close
             </Button>
           </div>
         </div>
@@ -583,14 +585,6 @@ export default function ChatPage() {
     ta.style.height = "auto";
     ta.style.height = Math.min(ta.scrollHeight, 220) + "px";
   }, [query]);
-
-  // Detect complexity + smart route
-  const detectMutation = useMutation({
-    mutationFn: async (q: string) => {
-      const res = await apiRequest("POST", "/api/detect-complexity", { query: q });
-      return res.json() as Promise<{ complexity: "simple" | "complex" }>;
-    },
-  });
 
   // Quick answer
   const quickMutation = useMutation({
@@ -646,21 +640,13 @@ export default function ChatPage() {
     onError: (e: Error) => toast({ title: "Could not launch the inquiry.", description: e.message, variant: "destructive" }),
   });
 
-  async function handleSubmit() {
+  function handleSubmit() {
     const q = query.trim();
     if (!q) return;
     setQuickMode(null);
-
-    // Detect complexity
-    const { complexity } = await detectMutation.mutateAsync(q);
-
-    if (complexity === "simple") {
-      // Show quick answer
-      quickMutation.mutate(q);
-    } else {
-      // Launch wizard
-      setShowWizard(true);
-    }
+    // Always get a quick answer first — user sees their inquiry understood immediately,
+    // then chooses to accept or escalate to the full expert debate.
+    quickMutation.mutate(q);
   }
 
   function handleWizardLaunch(cfg: {
@@ -674,7 +660,7 @@ export default function ChatPage() {
     inquireMutation.mutate({ q: query.trim(), ...cfg });
   }
 
-  const isProcessing = detectMutation.isPending || quickMutation.isPending || inquireMutation.isPending;
+  const isProcessing = quickMutation.isPending || inquireMutation.isPending;
 
   return (
     <Layout>
