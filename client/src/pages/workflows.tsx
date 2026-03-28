@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
@@ -28,10 +29,11 @@ function StepBuilder({
   steps: ParsedStep[];
   onChange: (steps: ParsedStep[]) => void;
 }) {
-  const [modelSearch, setModelSearch] = useState("");
-  const [addingStep, setAddingStep] = useState(false);
-  const [newModel, setNewModel] = useState<ModelOption | null>(null);
-  const [newPrompt, setNewPrompt] = useState("");
+  const [q, setQ] = useState("");
+  const [dropOpen, setDropOpen] = useState(false);
+  const [dropRect, setDropRect] = useState<DOMRect | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const { data: models = [], isLoading } = useQuery<ModelOption[]>({
     queryKey: ["/api/models"],
@@ -39,95 +41,112 @@ function StepBuilder({
   });
 
   const filtered = models
-    .filter(m => m.name.toLowerCase().includes(modelSearch.toLowerCase()) || m.id.toLowerCase().includes(modelSearch.toLowerCase()))
-    .slice(0, 8);
+    .filter(m => !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.id.toLowerCase().includes(q.toLowerCase()))
+    .slice(0, 10);
 
-  function addStep() {
-    if (!newModel) return;
-    onChange([...steps, { modelId: newModel.id, label: newModel.name, systemPrompt: newPrompt }]);
-    setNewModel(null); setNewPrompt(""); setModelSearch(""); setAddingStep(false);
+  function openDrop() {
+    if (inputRef.current) setDropRect(inputRef.current.getBoundingClientRect());
+    setDropOpen(true);
   }
 
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setDropOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  function addStep(m: ModelOption) {
+    onChange([...steps, { modelId: m.id, label: m.name, systemPrompt: "" }]);
+    setQ(""); setDropOpen(false);
+  }
   function removeStep(i: number) { onChange(steps.filter((_, j) => j !== i)); }
   function updatePrompt(i: number, p: string) {
     onChange(steps.map((s, j) => j === i ? { ...s, systemPrompt: p } : s));
   }
 
+  const dropdown = dropOpen ? createPortal(
+    <div
+      style={{
+        position: "fixed",
+        top: dropRect ? dropRect.bottom + 4 : 0,
+        left: dropRect ? dropRect.left : 0,
+        width: dropRect ? dropRect.width : "auto",
+        zIndex: 9999,
+      }}
+      className="border border-border rounded-lg bg-background shadow-xl max-h-56 overflow-y-auto"
+    >
+      {isLoading && <div className="px-3 py-2 text-xs text-muted-foreground">Loading models…</div>}
+      {!isLoading && filtered.length === 0 && q && (
+        <div className="px-3 py-2 text-xs text-muted-foreground">No models found for "{q}"</div>
+      )}
+      {!isLoading && filtered.length === 0 && !q && (
+        <div className="px-3 py-2 text-xs text-muted-foreground">Start typing to search models…</div>
+      )}
+      {filtered.map(m => (
+        <button
+          key={m.id}
+          onPointerDown={e => { e.preventDefault(); e.stopPropagation(); addStep(m); }}
+          className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors border-b border-border/50 last:border-0"
+        >
+          <p className="text-sm font-medium text-foreground">{m.name}</p>
+          <p className="text-xs text-muted-foreground">{m.id}</p>
+        </button>
+      ))}
+    </div>,
+    document.body
+  ) : null;
+
   return (
     <div className="space-y-2">
-      {steps.length === 0 && !addingStep && (
+      {steps.length === 0 && (
         <div className="border border-dashed border-border rounded-lg p-4 text-center">
-          <p className="text-xs text-muted-foreground">No steps yet. Add at least one model.</p>
+          <p className="text-xs text-muted-foreground">No models yet. Search below to add your first expert.</p>
         </div>
       )}
 
       {steps.map((step, i) => (
-        <div key={i} className="border border-border rounded-lg p-3 bg-card space-y-2">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-semibold flex-shrink-0">
+        <div key={i} className="border border-border rounded-lg bg-card overflow-hidden">
+          <div className="flex items-center gap-2.5 px-3 py-2.5">
+            <div className="w-5 h-5 rounded-full bg-foreground text-background text-xs flex items-center justify-center font-semibold flex-shrink-0">
               {i + 1}
             </div>
-            <p className="text-sm font-medium text-foreground flex-1 truncate">{step.label}</p>
-            <button onClick={() => removeStep(i)} className="text-muted-foreground hover:text-destructive transition-colors">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">{step.label}</p>
+              <p className="text-xs text-muted-foreground truncate">{step.modelId}</p>
+            </div>
+            <button onClick={() => removeStep(i)} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
-          <Textarea
-            placeholder="Custom system prompt (optional)…"
-            value={step.systemPrompt}
-            onChange={e => updatePrompt(i, e.target.value)}
-            className="text-xs resize-none"
-            rows={2}
-          />
+          <div className="px-3 pb-2.5 pt-2 border-t border-border/50">
+            <Textarea
+              placeholder={`Custom role for ${step.label.split(" ")[0]}… e.g. "You are a devil's advocate. Challenge every assumption."`}
+              value={step.systemPrompt}
+              onChange={e => updatePrompt(i, e.target.value)}
+              className="text-xs resize-none bg-transparent border-0 shadow-none focus-visible:ring-0 p-0 placeholder:text-muted-foreground/60 min-h-[2rem]"
+              rows={2}
+            />
+          </div>
         </div>
       ))}
 
-      {addingStep ? (
-        <div className="border border-border rounded-lg p-3 space-y-3 bg-card">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <Input
-              className="pl-9 text-sm"
-              placeholder="Search models…"
-              value={modelSearch}
-              onChange={e => { setModelSearch(e.target.value); setNewModel(null); }}
-            />
-          </div>
-          {modelSearch && filtered.length > 0 && (
-            <div className="border border-border rounded-lg divide-y divide-border bg-background shadow-sm max-h-36 overflow-y-auto">
-              {filtered.map(m => (
-                <button key={m.id} onClick={() => { setNewModel(m); setModelSearch(m.name); }}
-                  className={cn("w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors", newModel?.id === m.id && "bg-accent")}>
-                  <p className="font-medium text-foreground">{m.name}</p>
-                  <p className="text-muted-foreground">{m.id}</p>
-                </button>
-              ))}
-            </div>
-          )}
-          {isLoading && <p className="text-xs text-muted-foreground">Loading models…</p>}
-          <Textarea
-            placeholder="Custom system prompt (optional)…"
-            value={newPrompt}
-            onChange={e => setNewPrompt(e.target.value)}
-            className="text-sm resize-none"
-            rows={2}
+      {/* Search to add */}
+      <div ref={containerRef}>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            ref={inputRef}
+            className="pl-9 text-sm"
+            placeholder="Search and add a model…"
+            value={q}
+            onChange={e => { setQ(e.target.value); openDrop(); }}
+            onFocus={openDrop}
           />
-          <div className="flex gap-2">
-            <Button size="sm" onClick={addStep} disabled={!newModel} className="flex-1">Add step</Button>
-            <Button size="sm" variant="outline" onClick={() => { setAddingStep(false); setNewModel(null); setModelSearch(""); setNewPrompt(""); }}>
-              Cancel
-            </Button>
-          </div>
         </div>
-      ) : (
-        <button
-          data-testid="btn-add-step"
-          onClick={() => setAddingStep(true)}
-          className="w-full flex items-center gap-2 px-3 py-2 border border-dashed border-border rounded-lg text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Add model step
-        </button>
-      )}
+        {dropdown}
+      </div>
     </div>
   );
 }
@@ -144,11 +163,13 @@ function WorkflowFormDialog({
   const [name, setName] = useState(existing?.name ?? "");
   const [desc, setDesc] = useState(existing?.description ?? "");
   const [iters, setIters] = useState(existing?.iterations ?? 15);
+  const [temp, setTemp] = useState(existing?.temperature ?? 0.7);
+  const [threshold, setThreshold] = useState(existing?.consensusThreshold ?? 0.7);
   const [steps, setSteps] = useState<ParsedStep[]>(parseSteps(existing?.steps ?? "[]"));
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const payload = { name, description: desc, steps, iterations: iters, isDefault: false };
+      const payload = { name, description: desc, steps, iterations: iters, temperature: temp, consensusThreshold: threshold, isDefault: false };
       if (existing) return apiRequest("PUT", `/api/workflows/${existing.id}`, payload);
       return apiRequest("POST", "/api/workflows", payload);
     },
@@ -162,7 +183,7 @@ function WorkflowFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{existing ? "Edit workflow" : "New workflow"}</DialogTitle>
           <DialogDescription>Configure the model steps and debate settings.</DialogDescription>
@@ -177,13 +198,40 @@ function WorkflowFormDialog({
             <label className="text-sm font-medium text-foreground">Description <span className="text-muted-foreground font-normal">(optional)</span></label>
             <Input value={desc} onChange={e => setDesc(e.target.value)} placeholder="What is this workflow for?" />
           </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-foreground">Debate rounds</label>
-              <span className="text-sm font-mono text-foreground">{iters}</span>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-foreground">Rounds</label>
+                <span className="text-xs font-mono text-foreground">{iters}</span>
+              </div>
+              <input type="range" min={5} max={30} value={iters} onChange={e => setIters(Number(e.target.value))}
+                className="w-full accent-foreground" />
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>5</span><span>15</span><span>30</span>
+              </div>
             </div>
-            <input type="range" min={5} max={30} value={iters} onChange={e => setIters(Number(e.target.value))}
-              className="w-full accent-foreground" />
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-foreground">Temperature</label>
+                <span className="text-xs font-mono text-foreground">{temp.toFixed(1)}</span>
+              </div>
+              <input type="range" min={0} max={1} step={0.1} value={temp} onChange={e => setTemp(Number(e.target.value))}
+                className="w-full accent-foreground" />
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>0</span><span>0.7</span><span>1</span>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-foreground">Consensus</label>
+                <span className="text-xs font-mono text-foreground">{Math.round(threshold * 100)}%</span>
+              </div>
+              <input type="range" min={0.5} max={1} step={0.05} value={threshold} onChange={e => setThreshold(Number(e.target.value))}
+                className="w-full accent-foreground" />
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>50%</span><span>70%</span><span>100%</span>
+              </div>
+            </div>
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">Model steps</label>

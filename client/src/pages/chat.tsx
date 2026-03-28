@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -37,7 +38,7 @@ function StepDot({ n, current, done }: { n: number; current: number; done: boole
   );
 }
 
-// ─── Model search dropdown ────────────────────────────────────
+// ─── Model search dropdown (portal-based — renders above modal) ──
 function ModelSearch({
   models, loading, onSelect, placeholder = "Search models…"
 }: {
@@ -48,48 +49,73 @@ function ModelSearch({
 }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const filtered = models
     .filter(m => !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.id.toLowerCase().includes(q.toLowerCase()))
-    .slice(0, 8);
+    .slice(0, 10);
+
+  function openDropdown() {
+    if (inputRef.current) setRect(inputRef.current.getBoundingClientRect());
+    setOpen(true);
+  }
 
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
     }
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const dropdown = open ? createPortal(
+    <div
+      style={{
+        position: "fixed",
+        top: rect ? rect.bottom + 4 : 0,
+        left: rect ? rect.left : 0,
+        width: rect ? rect.width : "auto",
+        zIndex: 9999,
+      }}
+      className="border border-border rounded-lg bg-background shadow-xl max-h-56 overflow-y-auto"
+    >
+      {loading && <div className="px-3 py-2 text-xs text-muted-foreground">Loading models…</div>}
+      {!loading && filtered.length === 0 && q && (
+        <div className="px-3 py-2 text-xs text-muted-foreground">No models found for "{q}"</div>
+      )}
+      {!loading && filtered.length === 0 && !q && (
+        <div className="px-3 py-2 text-xs text-muted-foreground">Start typing to search models…</div>
+      )}
+      {filtered.map(m => (
+        <button
+          key={m.id}
+          onPointerDown={e => { e.preventDefault(); e.stopPropagation(); onSelect(m); setQ(""); setOpen(false); }}
+          className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors border-b border-border/50 last:border-0"
+        >
+          <p className="text-sm font-medium text-foreground">{m.name}</p>
+          <p className="text-xs text-muted-foreground">{m.id}</p>
+        </button>
+      ))}
+    </div>,
+    document.body
+  ) : null;
+
   return (
-    <div ref={ref} className="relative">
+    <div ref={containerRef}>
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
         <Input
+          ref={inputRef}
           className="pl-9 text-sm"
           placeholder={placeholder}
           value={q}
-          onChange={e => { setQ(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
+          onChange={e => { setQ(e.target.value); openDropdown(); }}
+          onFocus={openDropdown}
         />
       </div>
-      {open && (
-        <div className="absolute top-full left-0 right-0 mt-1 border border-border rounded-lg bg-background shadow-lg z-50 max-h-48 overflow-y-auto">
-          {loading && <div className="px-3 py-2 text-xs text-muted-foreground">Loading models…</div>}
-          {!loading && filtered.length === 0 && <div className="px-3 py-2 text-xs text-muted-foreground">No models found</div>}
-          {filtered.map(m => (
-            <button
-              key={m.id}
-              onMouseDown={() => { onSelect(m); setQ(""); setOpen(false); }}
-              className="w-full text-left px-3 py-2 hover:bg-accent transition-colors"
-            >
-              <p className="text-sm font-medium text-foreground">{m.name}</p>
-              <p className="text-xs text-muted-foreground">{m.id}</p>
-            </button>
-          ))}
-        </div>
-      )}
+      {dropdown}
     </div>
   );
 }
@@ -214,7 +240,7 @@ function InquiryWizard({
 
   return (
     <Dialog open onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <GitBranch className="w-4 h-4" />
@@ -327,15 +353,26 @@ function InquiryWizard({
                 placeholder={`Add expert ${steps.length + 1} of ${teamSize}…`}
               />
               {steps.map((s, i) => (
-                <div key={i} className="flex items-center gap-3 p-2.5 border border-border rounded-lg bg-card">
-                  <div className="w-5 h-5 rounded-full bg-foreground text-background text-xs flex items-center justify-center font-semibold flex-shrink-0">{i + 1}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{s.label}</p>
-                    <p className="text-xs text-muted-foreground truncate">{s.modelId}</p>
+                <div key={i} className="border border-border rounded-lg bg-card overflow-hidden">
+                  <div className="flex items-center gap-3 px-3 py-2.5">
+                    <div className="w-5 h-5 rounded-full bg-foreground text-background text-xs flex items-center justify-center font-semibold flex-shrink-0">{i + 1}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{s.label}</p>
+                      <p className="text-xs text-muted-foreground truncate">{s.modelId}</p>
+                    </div>
+                    <button onClick={() => removeModel(i)} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <button onClick={() => removeModel(i)} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="px-3 pb-2.5 border-t border-border/50 pt-2">
+                    <Textarea
+                      placeholder={`Custom role for ${s.label.split(" ")[0]}… e.g. "You are a devil's advocate. Challenge every assumption."`}
+                      value={s.systemPrompt}
+                      onChange={e => setSteps(prev => prev.map((step, j) => j === i ? { ...step, systemPrompt: e.target.value } : step))}
+                      className="text-xs resize-none bg-transparent border-0 shadow-none focus-visible:ring-0 p-0 placeholder:text-muted-foreground/60 min-h-[2rem]"
+                      rows={2}
+                    />
+                  </div>
                 </div>
               ))}
               {steps.length < teamSize && (
