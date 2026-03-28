@@ -463,21 +463,64 @@ export default function SessionPage() {
           )}
 
           {/* ── Live panel (real-time responses stream) ── */}
-          {isRunning && showLive && liveIters.length > 0 && (
+          {isRunning && showLive && (
             <div className="border border-border rounded-xl overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                 <span className="text-xs font-semibold text-foreground">Live — Expert debate in progress</span>
-                <Badge variant="outline" className="text-xs py-0 ml-auto">{liveIters.length} round{liveIters.length !== 1 ? "s" : ""} complete</Badge>
+                {liveIters.length > 0 && (
+                  <Badge variant="outline" className="text-xs py-0 ml-auto">
+                    {liveIters.length} round{liveIters.length !== 1 ? "s" : ""} complete
+                  </Badge>
+                )}
               </div>
-              <div className="p-4">
-                <LivePanel iters={liveIters} />
-              </div>
+
+              {/* ── No rounds yet: launching state ── */}
+              {liveIters.length === 0 && (
+                <div className="px-4 py-6 space-y-4">
+                  {/* Launching row */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
+                      <Loader2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 animate-spin" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Inquiry launched.</p>
+                      <p className="text-xs text-muted-foreground">
+                        Calling your expert team — first responses arriving shortly…
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Animated model placeholders */}
+                  <div className="ml-10 space-y-2">
+                    {[0, 1, 2].map(i => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 border border-border"
+                        style={{ opacity: 1 - i * 0.2, animationDelay: `${i * 0.15}s` }}
+                      >
+                        <div className="w-4 h-4 rounded-full skeleton flex-shrink-0" />
+                        <div className="flex-1 h-2.5 skeleton rounded-full" style={{ width: `${75 - i * 12}%` }} />
+                      </div>
+                    ))}
+                    <p className="text-xs text-muted-foreground pt-1 pl-1">
+                      Phase 1 of 5 — Research
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Rounds arriving ── */}
+              {liveIters.length > 0 && (
+                <div className="p-4">
+                  <LivePanel iters={liveIters} />
+                </div>
+              )}
             </div>
           )}
 
-          {/* Running spinner */}
-          {isRunning && (
+          {/* Running spinner — only shown when live panel is hidden */}
+          {isRunning && !showLive && (
             <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />
               Expert panel is debating your inquiry…
