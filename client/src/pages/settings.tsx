@@ -7,7 +7,10 @@ import { Input } from "@/components/ui/input";
 import { useTheme } from "@/App";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { Eye, EyeOff, Sun, Moon, Trash2, CheckCircle2, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Eye, EyeOff, Sun, Moon, Trash2, CheckCircle2, ExternalLink,
+  ChevronDown, ChevronUp, Unlink, KeyRound, Sparkles,
+} from "lucide-react";
 
 export default function SettingsPage() {
   const { theme, set: setTheme } = useTheme();
@@ -15,65 +18,105 @@ export default function SettingsPage() {
   const [newKey, setNewKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [showDanger, setShowDanger] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
 
   const { data: settings } = useQuery<{ apiKey: string; theme: string }>({
     queryKey: ["/api/settings"],
   });
 
+  const configured = settings?.apiKey === "***configured***";
+
+  // ─── Save key ─────────────────────────────────────────────
   const saveKeyMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/settings", { apiKey: newKey }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/models"] });
       queryClient.invalidateQueries({ queryKey: ["/api/onboarding"] });
-      toast({ title: "API key updated" });
       setNewKey("");
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 3000);
     },
-    onError: () => toast({ title: "Failed to save", variant: "destructive" }),
+    onError: () => toast({ title: "Failed to save key", variant: "destructive" }),
   });
 
+  // ─── Remove key ───────────────────────────────────────────
+  const removeKeyMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/settings", { apiKey: "" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/models"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/onboarding"] });
+      toast({ title: "API key removed" });
+    },
+    onError: () => toast({ title: "Failed to remove key", variant: "destructive" }),
+  });
+
+  // ─── Clear sessions ────────────────────────────────────────
   const clearSessionsMutation = useMutation({
     mutationFn: () => apiRequest("DELETE", "/api/sessions"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
-      toast({ title: "All sessions deleted" });
+      toast({ title: "All inquiry history deleted" });
     },
   });
-
-  const configured = settings?.apiKey === "***configured***";
 
   return (
     <Layout>
       <div className="h-full overflow-y-auto">
         <div className="max-w-xl mx-auto px-4 py-6 space-y-5">
+
           {/* Header */}
           <div>
             <h1 className="text-base font-semibold text-foreground">Settings</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">Configure Mercury — all settings persist on your server</p>
+            <p className="text-xs text-muted-foreground mt-0.5">All settings are stored on your server</p>
           </div>
 
-          {/* API Key */}
-          <div className="border border-border rounded-xl p-4 bg-card space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">OpenRouter API Key</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Stored securely on your server</p>
+          {/* ── API Key ─────────────────────────────────────── */}
+          <div className="border border-border rounded-xl overflow-hidden bg-card">
+
+            {/* Status bar */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-semibold text-foreground">OpenRouter API Key</span>
               </div>
-              {configured && (
-                <span className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 font-medium">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Configured
+              {configured ? (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-green-600 dark:text-green-400">
+                  <span className="w-2 h-2 rounded-full bg-green-500" />
+                  Connected
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <span className="w-2 h-2 rounded-full bg-muted-foreground/40" />
+                  Not connected
                 </span>
               )}
             </div>
 
-            <div className="space-y-2">
+            <div className="p-4 space-y-3">
+              {/* Success state */}
+              {justSaved && (
+                <div className="flex items-center gap-2.5 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/40 animate-fade-in-up">
+                  <Sparkles className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-green-700 dark:text-green-300">You're all set!</p>
+                    <p className="text-xs text-green-600/80 dark:text-green-400/80">
+                      Key saved securely on your server. 100+ models are now available.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Input */}
               <div className="relative">
                 <Input
                   data-testid="input-api-key"
                   type={showKey ? "text" : "password"}
-                  placeholder={configured ? "Enter new key to update…" : "sk-or-v1-…"}
+                  placeholder={configured ? "Enter new key to replace…" : "sk-or-v1-…"}
                   value={newKey}
                   onChange={e => setNewKey(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && newKey.trim() && saveKeyMutation.mutate()}
                   className="pr-10 font-mono text-sm"
                 />
                 <button
@@ -83,6 +126,7 @@ export default function SettingsPage() {
                   {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+
               <div className="flex items-center justify-between gap-3">
                 <a
                   href="https://openrouter.ai/keys"
@@ -90,8 +134,7 @@ export default function SettingsPage() {
                   rel="noopener noreferrer"
                   className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
                 >
-                  Get your key at openrouter.ai/keys
-                  <ExternalLink className="w-3 h-3" />
+                  openrouter.ai/keys <ExternalLink className="w-3 h-3" />
                 </a>
                 <Button
                   data-testid="btn-save-key"
@@ -99,72 +142,88 @@ export default function SettingsPage() {
                   onClick={() => saveKeyMutation.mutate()}
                   disabled={!newKey.trim() || saveKeyMutation.isPending}
                 >
-                  {saveKeyMutation.isPending ? "Saving…" : "Save key"}
+                  {saveKeyMutation.isPending ? "Saving…" : configured ? "Update key" : "Save key"}
                 </Button>
               </div>
+
+              {/* Disconnect option */}
+              {configured && (
+                <div className="pt-1 border-t border-border">
+                  <button
+                    onClick={() => {
+                      if (confirm("Remove your API key? You'll need to re-enter it to use Mercury.")) {
+                        removeKeyMutation.mutate();
+                      }
+                    }}
+                    disabled={removeKeyMutation.isPending}
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2"
+                  >
+                    <Unlink className="w-3.5 h-3.5" />
+                    {removeKeyMutation.isPending ? "Removing…" : "Disconnect API key"}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Appearance */}
+          {/* ── Appearance ──────────────────────────────────── */}
           <div className="border border-border rounded-xl p-4 bg-card space-y-3">
             <h2 className="text-sm font-semibold text-foreground">Appearance</h2>
             <div className="grid grid-cols-2 gap-2">
-              <button
-                data-testid="btn-light-mode"
-                onClick={() => setTheme("light")}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm transition-all",
-                  theme === "light"
-                    ? "border-foreground bg-accent text-foreground font-medium"
-                    : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
-                )}
-              >
-                <Sun className="w-4 h-4" />
-                Light
-                {theme === "light" && <CheckCircle2 className="w-3.5 h-3.5 ml-auto text-foreground" />}
-              </button>
-              <button
-                data-testid="btn-dark-mode"
-                onClick={() => setTheme("dark")}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm transition-all",
-                  theme === "dark"
-                    ? "border-foreground bg-accent text-foreground font-medium"
-                    : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
-                )}
-              >
-                <Moon className="w-4 h-4" />
-                Dark
-                {theme === "dark" && <CheckCircle2 className="w-3.5 h-3.5 ml-auto text-foreground" />}
-              </button>
+              {(["light", "dark"] as const).map(t => (
+                <button
+                  key={t}
+                  data-testid={`btn-${t}-mode`}
+                  onClick={() => setTheme(t)}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm transition-all",
+                    theme === t
+                      ? "border-foreground bg-accent text-foreground font-medium"
+                      : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                  )}
+                >
+                  {t === "light" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  {t === "light" ? "Light" : "Dark"}
+                  {theme === t && <CheckCircle2 className="w-3.5 h-3.5 ml-auto" />}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* About */}
+          {/* ── About ───────────────────────────────────────── */}
           <div className="border border-border rounded-xl p-4 bg-card space-y-3">
             <h2 className="text-sm font-semibold text-foreground">About Mercury</h2>
-            <div className="space-y-1.5 text-sm">
-              <div className="flex items-center justify-between text-sm">
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Version</span>
                 <span className="font-mono text-xs text-foreground">3.0.0</span>
               </div>
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Powered by</span>
-                <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer"
-                  className="text-xs text-foreground flex items-center gap-1 hover:opacity-70 transition-opacity">
+                <a
+                  href="https://openrouter.ai"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-foreground flex items-center gap-1 hover:opacity-70 transition-opacity"
+                >
                   OpenRouter <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
-              <div className="pt-2 space-y-1 text-xs text-muted-foreground">
-                <p>• Submit a query with a workflow</p>
-                <p>• Multiple AI models debate your inquiry independently</p>
-                <p>• Models debate, challenge, and vote over 15+ rounds</p>
-                <p>• A consensus answer emerges after debate from collective intelligence</p>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Source</span>
+                <a
+                  href="https://github.com/paulfxyz/mercury"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-foreground flex items-center gap-1 hover:opacity-70 transition-opacity"
+                >
+                  github.com/paulfxyz/mercury <ExternalLink className="w-3 h-3" />
+                </a>
               </div>
             </div>
           </div>
 
-          {/* Danger zone */}
+          {/* ── Danger zone ─────────────────────────────────── */}
           <div className="border border-destructive/30 rounded-xl p-4 space-y-3">
             <button
               onClick={() => setShowDanger(!showDanger)}
@@ -174,17 +233,17 @@ export default function SettingsPage() {
               {showDanger ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
             {showDanger && (
-              <div className="space-y-3 pt-1">
-                <div className="flex items-start justify-between gap-4">
+              <div className="space-y-3 pt-1 border-t border-destructive/20">
+                <div className="flex items-start justify-between gap-4 pt-2">
                   <div>
-                    <p className="text-sm font-medium text-foreground">Delete all sessions</p>
-                    <p className="text-xs text-muted-foreground">Permanently remove all research history and results.</p>
+                    <p className="text-sm font-medium text-foreground">Delete all inquiries</p>
+                    <p className="text-xs text-muted-foreground">Permanently removes all sessions, history and results.</p>
                   </div>
                   <Button
                     data-testid="btn-delete-all-sessions"
                     variant="destructive"
                     size="sm"
-                    onClick={() => confirm("Delete ALL sessions? This cannot be undone.") && clearSessionsMutation.mutate()}
+                    onClick={() => confirm("Delete ALL inquiry history? This cannot be undone.") && clearSessionsMutation.mutate()}
                     disabled={clearSessionsMutation.isPending}
                     className="flex-shrink-0"
                   >
@@ -195,6 +254,7 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
+
         </div>
       </div>
     </Layout>

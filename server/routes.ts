@@ -42,7 +42,8 @@ export function registerRoutes(httpServer: Server, app: Express) {
 
   app.post("/api/settings", (req, res) => {
     const { apiKey } = req.body;
-    if (!apiKey) return res.status(400).json({ error: "apiKey required" });
+    if (apiKey === undefined) return res.status(400).json({ error: "apiKey required" });
+    // Allow empty string to clear/disconnect the key
     storage.setSetting("openrouter_api_key", apiKey);
     res.json({ success: true });
   });

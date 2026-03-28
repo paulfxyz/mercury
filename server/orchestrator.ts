@@ -30,7 +30,7 @@ async function callModel(
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       "HTTP-Referer": "https://mercury.sh",
-      "X-Title": "Mercury — Deep Research Engine",
+      "X-Title": "Mercury - Deep Research Engine",
     },
     body: JSON.stringify(body),
   });
