@@ -10,8 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
-  ArrowUp, Clock, Zap, GitBranch, ChevronRight, X,
+  ArrowUp, Zap, GitBranch, X,
   Plus, Trash2, Search, Thermometer, Check, Save, Star, Loader2,
+  ChevronRight, Bolt, SlidersHorizontal,
 } from "lucide-react";
 import type { Workflow, Session } from "@shared/schema";
 
@@ -22,23 +23,33 @@ function parseSteps(raw: string): WizardStep[] {
   try { return JSON.parse(raw); } catch { return []; }
 }
 
+// ─── Quick-debate defaults ─────────────────────────────────────
+const QUICK_MODELS = [
+  "openai/gpt-4o",
+  "anthropic/claude-3.5-sonnet",
+  "google/gemini-2.0-flash-001",
+];
+const QUICK_ROUNDS = 3;
+const QUICK_TEMP = 0.3;
+const QUICK_THRESHOLD = 0.7;
+
 // ─── Step dot ─────────────────────────────────────────────────
 function StepDot({ n, active, done }: { n: number; active: boolean; done: boolean }) {
   return (
     <div className={cn(
       "w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 transition-all",
-      done ? "bg-foreground text-background" :
+      done  ? "bg-foreground text-background" :
       active ? "border-2 border-foreground text-foreground" :
-      "border border-border text-muted-foreground"
+               "border border-border text-muted-foreground"
     )}>
       {done ? <Check className="w-3 h-3" /> : n}
     </div>
   );
 }
 
-// ─── Model search — plain dropdown, no portal, no Radix ───────
+// ─── Model search ──────────────────────────────────────────────
 function ModelSearch({
-  models, loading, onSelect, placeholder = "Search models…"
+  models, loading, onSelect, placeholder = "Search models…",
 }: {
   models: ModelOption[];
   loading: boolean;
@@ -84,13 +95,7 @@ function ModelSearch({
           {filtered.map(m => (
             <button
               key={m.id}
-              // Plain mousedown — works perfectly in a non-Dialog context
-              onMouseDown={e => {
-                e.preventDefault();
-                onSelect(m);
-                setQ("");
-                setOpen(false);
-              }}
+              onMouseDown={e => { e.preventDefault(); onSelect(m); setQ(""); setOpen(false); }}
               className="w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b border-border/40 last:border-0"
             >
               <p className="text-sm font-medium text-foreground">{m.name}</p>
@@ -99,6 +104,125 @@ function ModelSearch({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Debate starter — shown after quick answer ─────────────────
+function DebateStarter({
+  workflows,
+  workflowsLoading,
+  onQuickLaunch,
+  onWorkflowLaunch,
+  onCustomSetup,
+  launching,
+}: {
+  workflows: Workflow[];
+  workflowsLoading: boolean;
+  onQuickLaunch: () => void;
+  onWorkflowLaunch: (wf: Workflow) => void;
+  onCustomSetup: () => void;
+  launching: boolean;
+}) {
+  return (
+    <div className="space-y-2.5 animate-fade-in-up">
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-0.5">
+        How do you want to run the debate?
+      </p>
+
+      {/* Quick option */}
+      <button
+        onClick={onQuickLaunch}
+        disabled={launching}
+        className={cn(
+          "w-full text-left p-4 rounded-xl border border-border",
+          "hover:border-foreground/30 hover:bg-accent/20 transition-all group",
+          "flex items-start gap-3.5",
+          launching && "opacity-50 cursor-not-allowed"
+        )}
+        data-testid="btn-quick-debate"
+      >
+        <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <Bolt className="w-4 h-4 text-amber-500" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-foreground">Quick debate</p>
+            <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-medium">Recommended</Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Top 3 models · {QUICK_ROUNDS} rounds · temp {QUICK_TEMP} — fast and reliable.
+          </p>
+          <div className="flex flex-wrap gap-1 mt-2">
+            {["GPT-4o", "Claude 3.5", "Gemini 2.0"].map(l => (
+              <span key={l} className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-medium">{l}</span>
+            ))}
+          </div>
+        </div>
+        {launching
+          ? <Loader2 className="w-4 h-4 text-muted-foreground animate-spin flex-shrink-0 mt-1" />
+          : <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground flex-shrink-0 mt-1 transition-colors" />
+        }
+      </button>
+
+      {/* Saved workflows */}
+      {!workflowsLoading && workflows.length > 0 && (
+        <div className="space-y-1.5">
+          {workflows.map(wf => {
+            const steps = parseSteps(wf.steps);
+            return (
+              <button
+                key={wf.id}
+                onClick={() => onWorkflowLaunch(wf)}
+                disabled={launching}
+                className={cn(
+                  "w-full text-left p-3.5 rounded-xl border border-border",
+                  "hover:border-foreground/30 hover:bg-accent/20 transition-all group",
+                  "flex items-center gap-3",
+                  launching && "opacity-50 cursor-not-allowed"
+                )}
+                data-testid={`btn-workflow-${wf.id}`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                  {wf.isDefault === 1
+                    ? <Star className="w-3.5 h-3.5 text-amber-500 fill-current" />
+                    : <GitBranch className="w-3.5 h-3.5 text-muted-foreground" />
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">{wf.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {steps.length} model{steps.length !== 1 ? "s" : ""} · {wf.iterations} rounds · temp {wf.temperature?.toFixed(1)}
+                  </p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground flex-shrink-0 transition-colors" />
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Custom setup */}
+      <button
+        onClick={onCustomSetup}
+        disabled={launching}
+        className={cn(
+          "w-full text-left p-3.5 rounded-xl border border-dashed border-border",
+          "hover:border-foreground/30 hover:bg-accent/10 transition-all group",
+          "flex items-center gap-3",
+          launching && "opacity-50 cursor-not-allowed"
+        )}
+        data-testid="btn-custom-setup"
+      >
+        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+          <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-foreground">Custom setup</p>
+          <p className="text-xs text-muted-foreground">Choose models, rounds, temperature and more.</p>
+        </div>
+        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground flex-shrink-0 transition-colors" />
+      </button>
     </div>
   );
 }
@@ -119,20 +243,11 @@ function InquiryWizard({
     workflowId?: string;
   }) => void;
 }) {
-  const { data: workflows = [], isLoading: workflowsLoading } = useQuery<Workflow[]>({ queryKey: ["/api/workflows"] });
+  const { data: workflows = [] } = useQuery<Workflow[]>({ queryKey: ["/api/workflows"] });
   const { data: models = [], isLoading: modelsLoading } = useQuery<ModelOption[]>({ queryKey: ["/api/models"], staleTime: 60_000 });
   const { toast } = useToast();
 
   const [step, setStep] = useState(1);
-  const [initialized, setInitialized] = useState(false);
-  useEffect(() => {
-    if (!workflowsLoading && !initialized) {
-      setInitialized(true);
-      if (workflows.length === 0) setStep(2);
-    }
-  }, [workflowsLoading, workflows.length, initialized]);
-
-  const [useExisting, setUseExisting] = useState<string | null>(null);
   const [teamSize, setTeamSize] = useState(3);
   const [steps, setSteps] = useState<WizardStep[]>([]);
   const [rounds, setRounds] = useState(15);
@@ -142,16 +257,8 @@ function InquiryWizard({
   const [saveName, setSaveName] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Scroll to top on step change
   const bodyRef = useRef<HTMLDivElement>(null);
   useEffect(() => { bodyRef.current?.scrollTo(0, 0); }, [step]);
-
-  function applyWorkflow(wf: Workflow) {
-    const s = parseSteps(wf.steps);
-    setSteps(s); setTeamSize(s.length); setRounds(wf.iterations);
-    setTemperature(wf.temperature ?? 0.7); setThreshold(wf.consensusThreshold ?? 0.7);
-    setSaveName(wf.name); setUseExisting(wf.id); setStep(5);
-  }
 
   function addModel(m: ModelOption) {
     if (steps.length >= teamSize) return;
@@ -167,9 +274,9 @@ function InquiryWizard({
       toast({ title: "Please add at least one model to your expert team.", variant: "destructive" });
       return;
     }
-    let workflowId = useExisting ?? undefined;
+    let workflowId: string | undefined;
 
-    if (wantToSave && saveName.trim() && !useExisting) {
+    if (wantToSave && saveName.trim()) {
       setSaving(true);
       try {
         const res = await apiRequest("POST", "/api/workflows", {
@@ -180,7 +287,7 @@ function InquiryWizard({
         const wf = await res.json();
         workflowId = wf.id;
         await queryClient.invalidateQueries({ queryKey: ["/api/workflows"] });
-        toast({ title: `Workflow "${saveName.trim()}" saved successfully.`, description: "It's ready to use in future inquiries." });
+        toast({ title: `Workflow "${saveName.trim()}" saved successfully.`, description: "It is ready to use in future inquiries." });
       } catch {
         toast({ title: "Could not save the workflow.", description: "Your inquiry will still run.", variant: "destructive" });
       }
@@ -190,19 +297,22 @@ function InquiryWizard({
     onLaunch({ selectedModels: steps.map(s => s.modelId), iterations: rounds, temperature, consensusThreshold: threshold, workflowId });
   }
 
-  const hasWorkflows = workflows.length > 0;
-  const STEPS = hasWorkflows
-    ? [{ n: 1, label: "Saved" }, { n: 2, label: "Size" }, { n: 3, label: "Models" }, { n: 4, label: "Rounds" }, { n: 5, label: "Config" }]
-    : [{ n: 2, label: "Size" }, { n: 3, label: "Models" }, { n: 4, label: "Rounds" }, { n: 5, label: "Config" }];
+  // 4 steps: Size → Models → Rounds → Config
+  const STEPS = [
+    { n: 1, label: "Size" },
+    { n: 2, label: "Models" },
+    { n: 3, label: "Rounds" },
+    { n: 4, label: "Config" },
+  ];
 
   return (
     <div className="flex flex-col h-full w-full max-w-xl border-l border-border bg-background">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
         <div className="flex items-center gap-2.5">
-          <GitBranch className="w-4 h-4 text-muted-foreground" />
+          <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
           <div>
-            <p className="text-sm font-semibold text-foreground">Configure your expert team</p>
+            <p className="text-sm font-semibold text-foreground">Custom setup</p>
             <p className="text-xs text-muted-foreground truncate max-w-xs">{query.slice(0, 60)}{query.length > 60 ? "…" : ""}</p>
           </div>
         </div>
@@ -238,41 +348,8 @@ function InquiryWizard({
       {/* Scrollable body */}
       <div ref={bodyRef} className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
 
-        {/* Step 1 — saved workflows */}
+        {/* Step 1 — team size */}
         {step === 1 && (
-          <div className="space-y-3">
-            <p className="text-sm font-medium text-foreground">Use a saved workflow, or build a new one.</p>
-            {workflows.map(wf => {
-              const s = parseSteps(wf.steps);
-              return (
-                <button
-                  key={wf.id}
-                  onClick={() => applyWorkflow(wf)}
-                  className="w-full text-left p-3.5 rounded-xl border border-border hover:border-foreground/30 hover:bg-accent/30 transition-all"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{wf.name}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {s.length} model{s.length !== 1 ? "s" : ""} · {wf.iterations} rounds · temp {wf.temperature?.toFixed(1)}
-                      </p>
-                    </div>
-                    {wf.isDefault === 1 && <Star className="w-3.5 h-3.5 text-amber-500 fill-current flex-shrink-0" />}
-                  </div>
-                </button>
-              );
-            })}
-            <button
-              onClick={() => { setUseExisting(null); setStep(2); }}
-              className="w-full flex items-center gap-2 p-3.5 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
-            >
-              <Plus className="w-4 h-4" /> Build a new configuration
-            </button>
-          </div>
-        )}
-
-        {/* Step 2 — team size */}
-        {step === 2 && (
           <div className="space-y-4">
             <div>
               <p className="text-sm font-medium text-foreground mb-0.5">How many experts in your team?</p>
@@ -292,21 +369,20 @@ function InquiryWizard({
                 </button>
               ))}
             </div>
-            <Button className="w-full" onClick={() => setStep(3)}>
+            <Button className="w-full" onClick={() => setStep(2)}>
               Choose models <ChevronRight className="ml-1 w-4 h-4" />
             </Button>
           </div>
         )}
 
-        {/* Step 3 — models */}
-        {step === 3 && (
+        {/* Step 2 — models */}
+        {step === 2 && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-foreground">Select {teamSize} model{teamSize !== 1 ? "s" : ""}</p>
               <span className="text-xs text-muted-foreground tabular-nums">{steps.length} / {teamSize}</span>
             </div>
 
-            {/* Model search — native dropdown, zero conflicts */}
             <ModelSearch
               models={models}
               loading={modelsLoading}
@@ -314,7 +390,6 @@ function InquiryWizard({
               placeholder={steps.length < teamSize ? `Add expert ${steps.length + 1} of ${teamSize}…` : "Team complete"}
             />
 
-            {/* Added models */}
             <div className="space-y-2">
               {steps.map((s, i) => (
                 <div key={i} className="border border-border rounded-xl bg-card overflow-hidden">
@@ -330,7 +405,7 @@ function InquiryWizard({
                   </div>
                   <div className="px-3.5 pb-3 pt-2 border-t border-border/40">
                     <Textarea
-                      placeholder={`Role for ${s.label.split(" ")[0]}… e.g. "You are a devil's advocate. Challenge every assumption."`}
+                      placeholder={`Role for ${s.label.split(" ")[0]}… e.g. "You are a devil's advocate."`}
                       value={s.systemPrompt}
                       onChange={e => updatePrompt(i, e.target.value)}
                       className="text-xs resize-none bg-transparent border-0 shadow-none focus-visible:ring-0 p-0 placeholder:text-muted-foreground/50 min-h-[2rem]"
@@ -347,14 +422,14 @@ function InquiryWizard({
               </p>
             )}
 
-            <Button className="w-full" disabled={steps.length === 0} onClick={() => setStep(4)}>
+            <Button className="w-full" disabled={steps.length === 0} onClick={() => setStep(3)}>
               Set debate rounds <ChevronRight className="ml-1 w-4 h-4" />
             </Button>
           </div>
         )}
 
-        {/* Step 4 — rounds */}
-        {step === 4 && (
+        {/* Step 3 — rounds */}
+        {step === 3 && (
           <div className="space-y-5">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -366,15 +441,15 @@ function InquiryWizard({
                 <span>5 — Quick</span><span>15 — Balanced</span><span>30 — Deep</span>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">~1 API call per model per round. 15 rounds × 3 models = 45 calls.</p>
-            <Button className="w-full" onClick={() => setStep(5)}>
-              Temperature & consensus <ChevronRight className="ml-1 w-4 h-4" />
+            <p className="text-xs text-muted-foreground">~1 API call per model per round. {rounds} rounds × {steps.length || "?"} models = ~{rounds * (steps.length || 3)} calls.</p>
+            <Button className="w-full" onClick={() => setStep(4)}>
+              Temperature &amp; consensus <ChevronRight className="ml-1 w-4 h-4" />
             </Button>
           </div>
         )}
 
-        {/* Step 5 — temperature, consensus, save */}
-        {step === 5 && (
+        {/* Step 4 — temperature, consensus, save */}
+        {step === 4 && (
           <div className="space-y-5">
             {/* Temperature */}
             <div className="space-y-2">
@@ -422,41 +497,39 @@ function InquiryWizard({
             </div>
 
             {/* Save as workflow */}
-            {!useExisting && (
-              <div className={cn(
-                "rounded-xl border transition-all",
-                wantToSave ? "border-foreground/30 bg-accent/30 p-4" : "border-border p-3.5"
-              )}>
-                <div className="flex items-start gap-3">
-                  <button
-                    onClick={() => setWantToSave(!wantToSave)}
-                    className={cn(
-                      "w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all mt-0.5",
-                      wantToSave ? "bg-foreground border-foreground" : "border-muted-foreground hover:border-foreground"
-                    )}
-                  >
-                    {wantToSave && <Check className="w-2.5 h-2.5 text-background" />}
+            <div className={cn(
+              "rounded-xl border transition-all",
+              wantToSave ? "border-foreground/30 bg-accent/30 p-4" : "border-border p-3.5"
+            )}>
+              <div className="flex items-start gap-3">
+                <button
+                  onClick={() => setWantToSave(!wantToSave)}
+                  className={cn(
+                    "w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all mt-0.5",
+                    wantToSave ? "bg-foreground border-foreground" : "border-muted-foreground hover:border-foreground"
+                  )}
+                >
+                  {wantToSave && <Check className="w-2.5 h-2.5 text-background" />}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <button onClick={() => setWantToSave(!wantToSave)} className="text-sm font-medium text-foreground text-left">
+                    Save as a workflow
                   </button>
-                  <div className="flex-1 min-w-0">
-                    <button onClick={() => setWantToSave(!wantToSave)} className="text-sm font-medium text-foreground text-left">
-                      Save as a workflow
-                    </button>
-                    <p className="text-xs text-muted-foreground mt-0.5">Reuse this configuration in future inquiries.</p>
-                    {wantToSave && (
-                      <Input
-                        autoFocus
-                        className="mt-2.5 text-sm"
-                        placeholder="Name it, e.g. Deep Research, Devil's Advocate…"
-                        value={saveName}
-                        onChange={e => setSaveName(e.target.value)}
-                        onKeyDown={e => e.key === "Enter" && saveName.trim() && handleLaunch()}
-                      />
-                    )}
-                  </div>
-                  <Save className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground mt-0.5">Reuse this configuration in future inquiries.</p>
+                  {wantToSave && (
+                    <Input
+                      autoFocus
+                      className="mt-2.5 text-sm"
+                      placeholder="Name it, e.g. Deep Research, Devil's Advocate…"
+                      value={saveName}
+                      onChange={e => setSaveName(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && saveName.trim() && handleLaunch()}
+                    />
+                  )}
                 </div>
+                <Save className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
               </div>
-            )}
+            </div>
 
             <Button
               className="w-full"
@@ -478,13 +551,12 @@ function InquiryWizard({
   );
 }
 
-// ─── Quick answer banner ──────────────────────────────────────
+// ─── Quick answer banner ───────────────────────────────────────
 function QuickAnswerBanner({
-  answer, onAccept, onDebate, loading,
+  answer, onAccept, loading,
 }: {
   answer: string;
   onAccept: () => void;
-  onDebate: () => void;
   loading: boolean;
 }) {
   return (
@@ -492,7 +564,7 @@ function QuickAnswerBanner({
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
         <Zap className="w-3.5 h-3.5 text-amber-500" />
         <span className="text-xs font-semibold text-foreground">Initial answer</span>
-        <span className="text-xs text-muted-foreground ml-1">— Want to make sure? Run the expert debate.</span>
+        <span className="text-xs text-muted-foreground ml-1">— Want to make sure? Run the expert debate below.</span>
       </div>
       {loading ? (
         <div className="px-4 py-6 flex items-center justify-center gap-3">
@@ -500,33 +572,34 @@ function QuickAnswerBanner({
           <span className="text-sm text-muted-foreground">Getting an initial answer…</span>
         </div>
       ) : (
-        <div className="px-4 py-4 space-y-4">
+        <div className="px-4 py-4 space-y-3">
           <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{answer}</p>
-          <div className="flex gap-2">
-            <Button size="sm" onClick={onDebate} className="flex-1">
-              <GitBranch className="w-3.5 h-3.5 mr-1.5" />
-              Run expert debate
-            </Button>
-            <Button size="sm" variant="outline" onClick={onAccept} className="flex-1 text-muted-foreground">
-              Accept &amp; close
-            </Button>
-          </div>
+          <button
+            onClick={onAccept}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Accept this answer ↓
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-// ─── Main chat page ───────────────────────────────────────────
+// ─── Main chat page ────────────────────────────────────────────
 export default function ChatPage() {
   const [query, setQuery] = useState("");
-  const [showWizard, setShowWizard] = useState(false);
+  // "idle" | "debate-picker" | "wizard"
+  const [debateMode, setDebateMode] = useState<"idle" | "debate-picker" | "wizard">("idle");
   const [quickMode, setQuickMode] = useState<null | { sessionId: string; answer: string; loading: boolean }>(null);
+  const [quickLaunching, setQuickLaunching] = useState(false);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
   const { data: sessions = [] } = useQuery<Session[]>({ queryKey: ["/api/sessions"], staleTime: 5_000 });
+  const { data: workflows = [], isLoading: workflowsLoading } = useQuery<Workflow[]>({ queryKey: ["/api/workflows"] });
   const recentSessions = sessions.slice(0, 6);
 
   useEffect(() => {
@@ -573,27 +646,55 @@ export default function ChatPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
       navigate(`/session/${data.sessionId}`);
     },
-    onError: (e: Error) => toast({ title: "Could not launch the inquiry.", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => {
+      setQuickLaunching(false);
+      toast({ title: "Could not launch the inquiry.", description: e.message, variant: "destructive" });
+    },
   });
 
   function handleSubmit() {
     const q = query.trim();
     if (!q) return;
     setQuickMode(null);
-    setShowWizard(false);
+    setDebateMode("idle");
     quickMutation.mutate(q);
   }
 
   function handleWizardLaunch(cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string }) {
-    setShowWizard(false);
+    setDebateMode("idle");
     inquireMutation.mutate({ q: query.trim(), ...cfg });
   }
 
+  async function handleQuickLaunch() {
+    setQuickLaunching(true);
+    inquireMutation.mutate({
+      q: query.trim(),
+      selectedModels: QUICK_MODELS,
+      iterations: QUICK_ROUNDS,
+      temperature: QUICK_TEMP,
+      consensusThreshold: QUICK_THRESHOLD,
+    });
+  }
+
+  function handleWorkflowLaunch(wf: Workflow) {
+    const steps = parseSteps(wf.steps);
+    inquireMutation.mutate({
+      q: query.trim(),
+      selectedModels: steps.map(s => s.modelId),
+      iterations: wf.iterations,
+      temperature: wf.temperature ?? 0.7,
+      consensusThreshold: wf.consensusThreshold ?? 0.7,
+      workflowId: wf.id,
+    });
+  }
+
+  // Show debate picker as soon as quick answer is ready (not loading)
+  const showDebatePicker = debateMode === "debate-picker" && quickMode && !quickMode.loading;
+  const showWizard = debateMode === "wizard";
   const isProcessing = quickMutation.isPending || inquireMutation.isPending;
 
   return (
     <Layout>
-      {/* Two-panel layout: chat left + wizard right */}
       <div className="flex h-full overflow-hidden">
 
         {/* ── Left: chat panel ── */}
@@ -606,8 +707,9 @@ export default function ChatPage() {
               "w-full space-y-5 animate-fade-in-up transition-all duration-300",
               showWizard ? "max-w-xl" : "max-w-2xl"
             )}>
+
               {/* Hero */}
-              {!showWizard && (
+              {!quickMode && !showWizard && (
                 <div className="text-center space-y-2">
                   <div className="text-4xl select-none">☿</div>
                   <h1 className="text-xl font-semibold text-foreground">What do you want to inquire?</h1>
@@ -626,7 +728,7 @@ export default function ChatPage() {
                   ref={textareaRef}
                   data-testid="input-query"
                   value={query}
-                  onChange={e => { setQuery(e.target.value); setQuickMode(null); }}
+                  onChange={e => { setQuery(e.target.value); setQuickMode(null); setDebateMode("idle"); }}
                   onKeyDown={e => {
                     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSubmit(); }
                   }}
@@ -651,13 +753,24 @@ export default function ChatPage() {
                 </div>
               </div>
 
-              {/* Quick answer banner */}
+              {/* Quick answer */}
               {quickMode && (
                 <QuickAnswerBanner
                   answer={quickMode.answer}
                   loading={quickMode.loading}
-                  onAccept={() => { setQuickMode(null); setQuery(""); }}
-                  onDebate={() => setShowWizard(true)}
+                  onAccept={() => { setQuickMode(null); setQuery(""); setDebateMode("idle"); }}
+                />
+              )}
+
+              {/* Debate starter — appears when quick answer is ready */}
+              {quickMode && !quickMode.loading && debateMode !== "wizard" && (
+                <DebateStarter
+                  workflows={workflows}
+                  workflowsLoading={workflowsLoading}
+                  onQuickLaunch={handleQuickLaunch}
+                  onWorkflowLaunch={handleWorkflowLaunch}
+                  onCustomSetup={() => setDebateMode("wizard")}
+                  launching={quickLaunching || inquireMutation.isPending}
                 />
               )}
 
@@ -669,21 +782,14 @@ export default function ChatPage() {
                     {recentSessions.map(s => (
                       <button
                         key={s.id}
-                        data-testid={`recent-session-${s.id}`}
                         onClick={() => navigate(`/session/${s.id}`)}
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border bg-card hover:bg-accent/40 text-left transition-colors"
+                        className="w-full text-left px-3.5 py-3 rounded-xl border border-border hover:border-foreground/20 hover:bg-accent/20 transition-all group"
                       >
-                        <Clock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                        <span className="text-sm text-foreground flex-1 truncate">{s.title}</span>
-                        <span className={cn(
-                          "text-xs px-2 py-0.5 rounded-full flex-shrink-0",
-                          s.status === "completed" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
-                          s.status === "running" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
-                          s.status === "error" ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400" :
-                          "bg-muted text-muted-foreground"
-                        )}>
-                          {s.status}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 flex-shrink-0 group-hover:bg-foreground/40 transition-colors" />
+                          <p className="text-sm text-foreground truncate flex-1">{s.title || s.query}</p>
+                          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/0 group-hover:text-muted-foreground transition-all flex-shrink-0" />
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -693,20 +799,19 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* ── Right: wizard panel — slides in, no Dialog, no overlay ── */}
+        {/* ── Right: wizard panel ── */}
         <div className={cn(
-          "flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden",
-          showWizard ? "w-[480px]" : "w-0"
+          "flex-shrink-0 overflow-hidden transition-all duration-300 ease-out",
+          showWizard ? "w-full sm:w-[480px]" : "w-0"
         )}>
           {showWizard && (
             <InquiryWizard
               query={query}
-              onClose={() => setShowWizard(false)}
+              onClose={() => setDebateMode("debate-picker")}
               onLaunch={handleWizardLaunch}
             />
           )}
         </div>
-
       </div>
     </Layout>
   );

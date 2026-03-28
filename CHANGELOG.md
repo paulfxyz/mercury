@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.1.0] — 2026-03-28
+
+### Added
+- **Debate starter** — After the quick answer, users now see a three-choice picker before any wizard opens: _Quick debate_ (top 3 models · 3 rounds · temp 0.3, one-click), _Saved workflows_ (any saved template, one-click), or _Custom setup_ (opens the full wizard). The common path requires zero configuration.
+- **Quick debate defaults** — GPT-4o, Claude 3.5 Sonnet, and Gemini 2.0 Flash with 3 rounds and temperature 0.3; fast and reliable without any setup.
+- **Version stamping** — `package.json` version is now kept in sync with releases; CHANGELOG and GitHub releases are updated with every meaningful change.
+
+### Changed
+- Wizard panel is now only opened on explicit "Custom setup" — it no longer auto-opens for users who have saved workflows, reducing unnecessary friction.
+- `InquiryWizard` simplified from 5 steps to 4 (removed the "saved workflows" step; that choice now lives in the new debate starter).
+- `QuickAnswerBanner` no longer contains a "Run expert debate" button — the debate starter replaces that role with richer options.
+- Wizard header label changed from "Configure your expert team" to "Custom setup" to match the new flow.
+
+### Fixed
+- **Model selection in both wizards** — Replaced Radix `<Dialog>` overlays with sibling split-panel layouts in both `chat.tsx` and `workflows.tsx`. Root cause: Radix Dialog intercepts pointer events at the overlay level, making model dropdown selection impossible. Solution: panel slides in from the right as a plain sibling `div` with no overlay; `ModelSearch` uses `onMouseDown` so selection fires before any blur handler.
+- `WorkflowFormDialog` in `workflows.tsx` replaced with `WorkflowFormPanel` using the same split-panel pattern.
+- `ModelSearch` dropdown now uses relative positioning inside its container instead of `createPortal`, eliminating all z-index and pointer-capture conflicts.
+
+---
+
 ## [3.0.0] — 2026-03-28
 
 ### Added

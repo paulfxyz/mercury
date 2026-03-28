@@ -7,7 +7,7 @@
 *Every inquiry gets an immediate answer. Then an expert panel of AI models debates, challenges, and votes until they agree.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-3.0.0-brightgreen?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-3.1.0-brightgreen?style=for-the-badge)](CHANGELOG.md)
 [![Built with TypeScript](https://img.shields.io/badge/Built%20with-TypeScript-3178c6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Powered by OpenRouter](https://img.shields.io/badge/Powered%20by-OpenRouter-6c47ff?style=for-the-badge)](https://openrouter.ai)
 [![Deploy on Fly.io](https://img.shields.io/badge/Deploy%20on-Fly.io-7c3aed?style=for-the-badge&logo=flydotio&logoColor=white)](https://fly.io)
@@ -30,7 +30,7 @@
   ║                                                          ║
   ║   Submit → Initial answer → Debate → Consensus           ║
   ║                                                          ║
-  ║   v3.0.0  ·  mercury.sh  ·  github.com/paulfxyz          ║
+  ║   v3.1.0  ·  mercury.sh  ·  github.com/paulfxyz          ║
   ╚══════════════════════════════════════════════════════════╝
 ```
 
@@ -88,27 +88,37 @@ This is what actually happens when you submit an inquiry in Mercury v3:
 The moment you hit submit, Mercury calls `gpt-4o-mini` and returns an answer in ~1–2 seconds. This isn't a placeholder — it's a real, complete response. The UI shows:
 
 ```
-⚡ Initial answer — Want to make sure? Run the expert debate.
+⚡ Initial answer — Want to make sure? Run the expert debate below.
 
 [The answer text here, fully rendered]
 
-[ Run expert debate ]    [ Accept & close ]
+  Accept this answer ↓
 ```
 
-The **"Run expert debate"** button is the primary call to action. "Accept & close" is the opt-out if the quick answer was sufficient. This design means the user immediately sees their inquiry is understood, never stares at a spinner, and always has an answer to work from even if they choose not to debate it.
+The answer is real and usable — not a placeholder. Below it, the **debate starter** appears automatically.
 
-### Step 2 — Configure the expert team (wizard)
+### Step 2 — Choose how to run the debate
 
-Clicking "Run expert debate" opens a 4-step modal wizard:
+Instead of jumping straight into a configuration wizard, Mercury presents three clear options:
+
+| Option | What it does |
+|---|---|
+| ⚡ **Quick debate** | Launches instantly with GPT-4o + Claude 3.5 Sonnet + Gemini 2.0 Flash · 3 rounds · temperature 0.3. One click, no setup. |
+| ★ **Saved workflow** | Any workflow you've created appears here as a one-click option. Reuse a previous configuration without re-entering anything. |
+| ⚙ **Custom setup** | Opens a 4-step side panel — choose team size, pick models, set rounds, tune temperature and consensus. Save it as a workflow when you're done. |
+
+The common path — Quick debate — requires zero configuration and launches the debate in one click. The full wizard is always accessible but never mandatory.
+
+### Step 2b — Custom setup wizard (optional)
+
+If you choose "Custom setup", a panel slides in from the right:
 
 | Step | What happens |
 |---|---|
 | **Size** | Choose 2–12 models for the expert panel |
 | **Models** | Search OpenRouter's 100+ catalog. Each model gets an optional custom system prompt — assign roles like "You are a devil's advocate" or "Focus only on economic evidence" |
 | **Rounds** | 5–30 debate rounds. 15 is the default sweet spot |
-| **Config** | Temperature (0 = precise, 1 = creative), required consensus % (50–100%), optional: save this configuration as a named **workflow** for future use |
-
-If you have saved workflows, the wizard shows them first — one click to reuse a previous configuration and jump straight to launch.
+| **Config** | Temperature (0 = precise, 1 = creative), required consensus % (50–100%), optional: save this configuration as a named **workflow** for future reuse |
 
 ### Step 3 — The debate
 
@@ -143,7 +153,8 @@ The final answer carries:
 | Feature | Detail |
 |---|---|
 | ⚡ Immediate initial answer | Every inquiry gets a fast single-model response before any debate — never a blank screen |
-| 🧙 Expert team wizard | 4-step modal: team size → model selection → rounds → temperature + consensus config |
+| 🚀 One-click Quick debate | Launch with the top 3 models (GPT-4o, Claude 3.5, Gemini 2.0) · 3 rounds · temp 0.3 — no setup required |
+| 🧙 Expert team wizard | 4-step side panel: team size → model selection → rounds → temperature + consensus config |
 | 🎭 Custom model roles | Each model in the team gets an optional system prompt — assign devil's advocate, domain specialist, fact-checker |
 | 💾 Saved workflows | Name and save team configurations; one click to reuse in future inquiries |
 | 📡 Real-time live panel | WebSocket streams every model response as it arrives, grouped by round and phase |
@@ -354,19 +365,28 @@ const wsUrl = `${base.href}?sessionId=${id}`;
 
 `new URL("./ws", location.href)` resolves correctly regardless of where in the URL hierarchy the app lives.
 
-### 5. Portal dropdown vs. Radix Dialog pointer interception
+### 5. Radix Dialog kills model selection — ditch the Dialog entirely
 
-The model search dropdown in the wizard needed to float above the dialog. We used `createPortal()` to render it on `document.body` at `position: fixed` — this gets it out of the overflow container and makes it visually appear above everything.
+The model search dropdown needed to float above the dialog. We used `createPortal()` to render it on `document.body` at `position: fixed`, and tried `onPointerDown` with `stopPropagation` to outrun Radix's overlay.
 
-But Radix Dialog renders an invisible overlay div that intercepts pointer events across the entire viewport. A `click` on the dropdown would be swallowed by the dialog overlay before reaching the dropdown button.
+It didn't work. Radix Dialog's overlay fires `onPointerDownOutside` regardless — it captures pointer events at the document level before any child handler can prevent them. Every model selection attempt closed the dialog instead.
+
+The fix was to stop fighting the abstraction and remove the `<Dialog>` entirely:
 
 ```typescript
-// Wrong: click gets intercepted by Radix overlay
-onMouseDown={() => { onSelect(m); }}
+// Before: Radix Dialog with portalled dropdown — model selection broken
+<Dialog open={open} onOpenChange={setOpen}>
+  <DialogContent> <StepBuilder /> </DialogContent>
+</Dialog>
 
-// Correct: pointerdown fires before Radix can intercept, preventDefault stops bubbling
-onPointerDown={e => { e.preventDefault(); e.stopPropagation(); onSelect(m); }}
+// After: sibling split-panel — chat left, wizard slides in from right, zero overlay
+<div className="flex h-full overflow-hidden">
+  <div className="flex-1"> {/* chat */} </div>
+  <div className={cn("w-[480px] border-l", !open && "w-0")}> {/* wizard */} </div>
+</div>
 ```
+
+No overlay, no pointer capture, no z-index battles. `onMouseDown` on dropdown items works perfectly because there is nothing above them to intercept.
 
 ---
 
@@ -390,9 +410,9 @@ The synthesis phase explicitly benefits from this: when Claude has pushed back o
 
 At temperature 0.7+, models explore wildly different framings and the synthesis struggles to reconcile them. At 0.3 or below, models converge fast but the debate loses its depth. For most research inquiries, 0.5–0.7 is the right range. For creative or speculative questions, push toward 0.8. For technical or factual questions, 0.3–0.5.
 
-### The wizard should adapt to context
+### Reduce steps to the first decision point
 
-The first version of the wizard always showed the "use a saved workflow" screen first. When a user has no saved workflows, that screen is pure friction — it tells you nothing and makes you click through to what you actually want. The wizard now detects whether workflows exist and skips directly to team size if there are none. Ten lines of code, meaningfully better experience.
+The wizard used to be the first thing shown after the quick answer. But for most users the first real question is not "which models?" — it's "do I even need a full debate?" The debate starter answers that question first, with three options at a glance. The wizard only opens if the user explicitly wants more control. Ten lines of code, meaningfully better experience.
 
 ### Custom model roles change everything
 
@@ -501,7 +521,7 @@ Key insight: **diversity beats raw capability**. Three different mid-tier models
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
-Current: **v3.0.0** — immediate initial answer for every inquiry, 4-step wizard, custom model roles, portal dropdown, unified wizard UX, full Fly.io deployment with custom domain.
+Current: **v3.1.0** — debate starter (Quick debate / saved workflow / custom setup), split-panel wizard, model selection fixed, version-stamped releases.
 
 ---
 
