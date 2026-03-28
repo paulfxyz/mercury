@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import {
   ArrowUp, Zap, GitBranch, X,
   Plus, Trash2, Search, Thermometer, Check, Save, Star, Loader2,
-  ChevronRight, Bolt, SlidersHorizontal,
+  ChevronRight, Bolt, SlidersHorizontal, ThumbsUp,
 } from "lucide-react";
 import type { Workflow, Session } from "@shared/schema";
 
@@ -576,9 +576,10 @@ function QuickAnswerBanner({
           <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{answer}</p>
           <button
             onClick={onAccept}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
-            Accept this answer ↓
+            <ThumbsUp className="w-3.5 h-3.5" />
+            Accept this answer
           </button>
         </div>
       )}

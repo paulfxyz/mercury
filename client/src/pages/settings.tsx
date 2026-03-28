@@ -196,7 +196,7 @@ export default function SettingsPage() {
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Version</span>
-                <span className="font-mono text-xs text-foreground">3.0.0</span>
+                <span className="font-mono text-xs text-foreground">{__APP_VERSION__}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Powered by</span>

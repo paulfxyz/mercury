@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.1.1] — 2026-03-28
+
+### Changed
+- **Accept button** — "Accept this answer ↓" replaced with a 👍 `ThumbsUp` icon + "Accept this answer" for a cleaner, more inviting look.
+
+---
+
 ## [3.1.0] — 2026-03-28
 
 ### Added
