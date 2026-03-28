@@ -24,26 +24,15 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     fetch("./api/settings/theme")
       .then(r => r.json())
-      .then(d => {
-        const t: "light" | "dark" = d.theme === "dark" ? "dark" : "light";
-        applyTheme(t);
-        setThemeState(t);
-      })
-      .catch(() => {
-        const t: "light" | "dark" = matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light";
-        applyTheme(t);
-        setThemeState(t);
-      })
+      .then(d => { const t: "light" | "dark" = d.theme === "dark" ? "dark" : "light"; apply(t); setThemeState(t); })
+      .catch(() => { const t: "light" | "dark" = matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light"; apply(t); setThemeState(t); })
       .finally(() => setReady(true));
   }, []);
 
-  function applyTheme(t: "light" | "dark") {
-    document.documentElement.classList.toggle("dark", t === "dark");
-  }
+  function apply(t: "light" | "dark") { document.documentElement.classList.toggle("dark", t === "dark"); }
 
   const set = useCallback((t: "light" | "dark") => {
-    setThemeState(t);
-    applyTheme(t);
+    setThemeState(t); apply(t);
     fetch("./api/settings/theme", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ theme: t }) }).catch(() => {});
   }, []);
 
@@ -61,11 +50,11 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
   return <ThemeContext.Provider value={{ theme, toggle, set }}>{children}</ThemeContext.Provider>;
 }
 
-// ─── Onboarding guard ─────────────────────────────────────────
+// ─── Guard: API key only ─────────────────────────────────────
 function AppRouter() {
   const [location, navigate] = useLocation();
 
-  const { data: ob, isLoading } = useQuery<{ hasApiKey: boolean; hasWorkflow: boolean }>({
+  const { data: ob, isLoading } = useQuery<{ hasApiKey: boolean }>({
     queryKey: ["/api/onboarding"],
     staleTime: 0,
     refetchOnMount: true,
@@ -74,7 +63,7 @@ function AppRouter() {
   useEffect(() => {
     if (isLoading || !ob) return;
     const atOnboarding = location.startsWith("/onboarding");
-    if (!ob.hasApiKey || !ob.hasWorkflow) {
+    if (!ob.hasApiKey) {
       if (!atOnboarding) navigate("/onboarding");
     } else {
       if (location === "/" || atOnboarding) navigate("/chat");

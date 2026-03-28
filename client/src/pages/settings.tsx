@@ -146,7 +146,7 @@ export default function SettingsPage() {
             <div className="space-y-1.5 text-sm">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Version</span>
-                <span className="font-mono text-xs text-foreground">1.0.0</span>
+                <span className="font-mono text-xs text-foreground">3.0.0</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Powered by</span>
@@ -157,9 +157,9 @@ export default function SettingsPage() {
               </div>
               <div className="pt-2 space-y-1 text-xs text-muted-foreground">
                 <p>• Submit a query with a workflow</p>
-                <p>• Multiple AI models research it independently</p>
+                <p>• Multiple AI models debate your inquiry independently</p>
                 <p>• Models debate, challenge, and vote over 15+ rounds</p>
-                <p>• A consensus answer emerges from collective intelligence</p>
+                <p>• A consensus answer emerges after debate from collective intelligence</p>
               </div>
             </div>
           </div>

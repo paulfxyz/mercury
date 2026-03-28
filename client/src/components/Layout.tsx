@@ -2,19 +2,15 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "@/App";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  MessageSquare, GitBranch, Settings, Sun, Moon, Plus, Clock, Trash2
-} from "lucide-react";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { MessageSquare, GitBranch, Settings, Sun, Moon, Plus, Clock } from "lucide-react";
 import type { Session } from "@shared/schema";
 
-// Mercury wordmark
-function MercuryLogo({ collapsed }: { collapsed: boolean }) {
+function MercuryLogo() {
   return (
-    <div className={cn("flex items-center gap-2.5 font-semibold text-foreground select-none", collapsed && "justify-center")}>
+    <div className="flex items-center gap-2.5 font-semibold text-foreground select-none">
       <span className="text-xl leading-none flex-shrink-0">☿</span>
-      {!collapsed && <span className="text-sm tracking-tight">Mercury</span>}
+      <span className="text-sm tracking-tight">Mercury</span>
     </div>
   );
 }
@@ -31,27 +27,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const recentSessions = sessions.slice(0, 8);
 
   const navLink = (href: string, icon: React.ReactNode, label: string) => {
-    const active = location === href || (href === "/chat" && location === "/");
+    const active = location === href || (href === "/chat" && (location === "/" || location === "/chat"));
     return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Link href={href}>
-            <button
-              data-testid={`nav-${label.toLowerCase()}`}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-                active
-                  ? "bg-accent text-accent-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
-              )}
-            >
-              <span className="flex-shrink-0">{icon}</span>
-              <span className="truncate">{label}</span>
-            </button>
-          </Link>
-        </TooltipTrigger>
-        <TooltipContent side="right" className="hidden">{label}</TooltipContent>
-      </Tooltip>
+      <Link href={href}>
+        <button
+          data-testid={`nav-${label.toLowerCase().replace(/\s/g, "-")}`}
+          className={cn(
+            "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
+            active
+              ? "bg-accent text-accent-foreground font-medium"
+              : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+          )}
+        >
+          <span className="flex-shrink-0">{icon}</span>
+          <span className="truncate">{label}</span>
+        </button>
+      </Link>
     );
   };
 
@@ -61,23 +52,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* Sidebar */}
         <aside className="flex flex-col w-56 flex-shrink-0 border-r border-border bg-sidebar">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 h-14 border-b border-sidebar-border">
-            <MercuryLogo collapsed={false} />
+          <div className="flex items-center px-4 h-14 border-b border-sidebar-border">
+            <MercuryLogo />
           </div>
 
-          {/* Primary nav */}
-          <div className="p-2 space-y-0.5">
+          {/* New Inquiry CTA */}
+          <div className="p-2">
             <Link href="/chat">
               <button
-                data-testid="nav-new-research"
+                data-testid="nav-new-inquiry"
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
               >
                 <Plus className="w-4 h-4 flex-shrink-0" />
-                New Research
+                New Inquiry
               </button>
             </Link>
           </div>
 
+          {/* Nav links */}
           <div className="px-2 space-y-0.5">
             {navLink("/chat", <MessageSquare className="w-4 h-4" />, "Chat")}
             {navLink("/workflows", <GitBranch className="w-4 h-4" />, "Workflows")}
@@ -87,14 +79,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {/* Recent sessions */}
           {recentSessions.length > 0 && (
             <div className="px-2 mt-4 flex-1 overflow-hidden flex flex-col min-h-0">
-              <p className="px-3 pb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Recent</p>
+              <p className="px-3 pb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Recent
+              </p>
               <div className="overflow-y-auto flex-1 space-y-0.5 pr-1">
-                {recentSessions.map((s) => (
+                {recentSessions.map(s => (
                   <Link key={s.id} href={`/session/${s.id}`}>
                     <button
                       data-testid={`session-link-${s.id}`}
                       className={cn(
-                        "w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-left transition-colors group",
+                        "w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-left transition-colors",
                         location === `/session/${s.id}`
                           ? "bg-accent text-foreground"
                           : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
@@ -115,7 +109,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
           )}
 
-          {/* Footer: theme toggle */}
+          {/* Theme toggle */}
           <div className="p-2 border-t border-sidebar-border mt-auto">
             <button
               data-testid="btn-theme-toggle"
