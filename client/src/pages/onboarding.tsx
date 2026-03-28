@@ -18,10 +18,10 @@ export default function OnboardingPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/onboarding"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/models"] });
-      toast({ title: "API key saved" });
+      toast({ title: "API key saved successfully.", description: "You now have access to 100+ AI models via OpenRouter." });
       navigate("/chat");
     },
-    onError: () => toast({ title: "Failed to save key", variant: "destructive" }),
+    onError: () => toast({ title: "Could not save your API key.", description: "Please check the key and try again.", variant: "destructive" }),
   });
 
   return (

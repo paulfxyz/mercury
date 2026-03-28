@@ -154,10 +154,10 @@ function WorkflowFormDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/workflows"] });
-      toast({ title: existing ? "Workflow updated" : "Workflow created" });
+      toast({ title: existing ? "Workflow updated successfully." : "Workflow created successfully.", description: existing ? "Your changes have been saved." : "It's ready to use in your next inquiry." });
       onClose();
     },
-    onError: () => toast({ title: "Save failed", variant: "destructive" }),
+    onError: () => toast({ title: "Could not save the workflow.", description: "Please check your inputs and try again.", variant: "destructive" }),
   });
 
   return (
@@ -217,7 +217,7 @@ export default function WorkflowsPage() {
     mutationFn: (id: string) => apiRequest("DELETE", `/api/workflows/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/workflows"] });
-      toast({ title: "Deleted" });
+      toast({ title: "Workflow deleted.", description: "It has been permanently removed." });
     },
   });
 

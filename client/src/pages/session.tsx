@@ -201,7 +201,7 @@ function Results({ session, iterations, isQuick }: { session: Session; iteration
       await navigator.clipboard.writeText(finalAnswer);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch { toast({ title: "Copy failed", variant: "destructive" }); }
+    } catch { toast({ title: "Could not copy to clipboard.", description: "Please try selecting and copying the text manually.", variant: "destructive" }); }
   }
 
   function download() {
@@ -349,7 +349,7 @@ export default function SessionPage() {
           queryClient.invalidateQueries({ queryKey: ["/api/sessions", id] });
           queryClient.invalidateQueries({ queryKey: ["/api/sessions", id, "iterations"] });
         }
-        if (d.type === "error") toast({ title: "Error", description: d.message, variant: "destructive" });
+        if (d.type === "error") toast({ title: "Something went wrong during the inquiry.", description: d.message, variant: "destructive" });
       } catch {}
     };
     return () => ws.close();

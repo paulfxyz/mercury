@@ -37,7 +37,7 @@ export default function SettingsPage() {
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 3000);
     },
-    onError: () => toast({ title: "Failed to save key", variant: "destructive" }),
+    onError: () => toast({ title: "Could not save your API key.", description: "Please check the key and try again.", variant: "destructive" }),
   });
 
   // ─── Remove key ───────────────────────────────────────────
@@ -47,9 +47,9 @@ export default function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/models"] });
       queryClient.invalidateQueries({ queryKey: ["/api/onboarding"] });
-      toast({ title: "API key removed" });
+      toast({ title: "API key disconnected.", description: "You can reconnect at any time from Settings." });
     },
-    onError: () => toast({ title: "Failed to remove key", variant: "destructive" }),
+    onError: () => toast({ title: "Could not remove the API key.", description: "Please try again.", variant: "destructive" }),
   });
 
   // ─── Clear sessions ────────────────────────────────────────
@@ -57,7 +57,7 @@ export default function SettingsPage() {
     mutationFn: () => apiRequest("DELETE", "/api/sessions"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
-      toast({ title: "All inquiry history deleted" });
+      toast({ title: "All inquiry history has been deleted.", description: "Your workflows and settings are still intact." });
     },
   });
 

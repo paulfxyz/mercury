@@ -111,23 +111,34 @@ function InquiryWizard({
     saveAs?: string;
   }) => void;
 }) {
-  const [step, setStep] = useState(1); // 1-5
-  const [useExisting, setUseExisting] = useState<string | null>(null); // workflow id or null
-  const [teamSize, setTeamSize] = useState(3);
-  const [steps, setSteps] = useState<WizardStep[]>([]);
-  const [rounds, setRounds] = useState(15);
-  const [temperature, setTemperature] = useState(0.7);
-  const [consensusThreshold, setConsensusThreshold] = useState(0.7);
-  const [saveName, setSaveName] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const { data: workflows = [] } = useQuery<Workflow[]>({ queryKey: ["/api/workflows"] });
+  const { data: workflows = [], isLoading: workflowsLoading } = useQuery<Workflow[]>({ queryKey: ["/api/workflows"] });
   const { data: models = [], isLoading: modelsLoading } = useQuery<ModelOption[]>({
     queryKey: ["/api/models"], staleTime: 60_000,
   });
   const { toast } = useToast();
 
-  // If using existing workflow, pre-fill
+  // Start at step 1 (saved workflows) if any exist, else jump straight to step 2
+  const [step, setStep] = useState<number>(() => 1); // will be corrected once workflows load
+  const [initialized, setInitialized] = useState(false);
+
+  // Once we know whether there are workflows, set the correct starting step
+  useEffect(() => {
+    if (!workflowsLoading && !initialized) {
+      setInitialized(true);
+      if (workflows.length === 0) setStep(2); // no saved workflows → skip straight to building
+    }
+  }, [workflowsLoading, workflows.length, initialized]);
+
+  const [useExisting, setUseExisting] = useState<string | null>(null);
+  const [teamSize, setTeamSize] = useState(3);
+  const [steps, setSteps] = useState<WizardStep[]>([]);
+  const [rounds, setRounds] = useState(15);
+  const [temperature, setTemperature] = useState(0.7);
+  const [consensusThreshold, setConsensusThreshold] = useState(0.7);
+  const [wantToSave, setWantToSave] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  const [saving, setSaving] = useState(false);
+
   function applyWorkflow(wf: Workflow) {
     const s = parseSteps(wf.steps);
     setSteps(s);
@@ -137,7 +148,7 @@ function InquiryWizard({
     setConsensusThreshold(wf.consensusThreshold ?? 0.7);
     setSaveName(wf.name);
     setUseExisting(wf.id);
-    setStep(5); // jump to review
+    setStep(5);
   }
 
   function addModel(m: ModelOption) {
@@ -147,10 +158,13 @@ function InquiryWizard({
   function removeModel(i: number) { setSteps(prev => prev.filter((_, j) => j !== i)); }
 
   async function handleLaunch() {
-    if (!steps.length) { toast({ title: "Add at least one model", variant: "destructive" }); return; }
+    if (!steps.length) {
+      toast({ title: "Please add at least one model to your expert team.", variant: "destructive" });
+      return;
+    }
     let workflowId: string | undefined = useExisting ?? undefined;
 
-    if (saveName.trim() && !useExisting) {
+    if (wantToSave && saveName.trim() && !useExisting) {
       setSaving(true);
       try {
         const res = await apiRequest("POST", "/api/workflows", {
@@ -164,8 +178,17 @@ function InquiryWizard({
         const wf = await res.json();
         workflowId = wf.id;
         await queryClient.invalidateQueries({ queryKey: ["/api/workflows"] });
-        toast({ title: `Workflow "${saveName}" saved` });
-      } catch { toast({ title: "Couldn't save workflow", variant: "destructive" }); }
+        toast({
+          title: `Workflow "${saveName.trim()}" saved successfully.`,
+          description: "It will appear in your saved workflows for future inquiries.",
+        });
+      } catch {
+        toast({
+          title: "Could not save the workflow.",
+          description: "Your inquiry will still run. You can save it later from the Workflows page.",
+          variant: "destructive",
+        });
+      }
       setSaving(false);
     }
 
@@ -175,17 +198,19 @@ function InquiryWizard({
       temperature,
       consensusThreshold,
       workflowId,
-      saveAs: saveName.trim() || undefined,
+      saveAs: (wantToSave && saveName.trim()) ? saveName.trim() : undefined,
     });
   }
 
-  const STEPS = [
-    { n: 1, label: "Team" },
-    { n: 2, label: "Size" },
-    { n: 3, label: "Models" },
-    { n: 4, label: "Rounds" },
-    { n: 5, label: "Config" },
-  ];
+  // Step labels — step 1 only shown when there are saved workflows
+  const hasWorkflows = workflows.length > 0;
+  const STEPS = hasWorkflows
+    ? [{ n: 1, label: "Saved" }, { n: 2, label: "Size" }, { n: 3, label: "Models" }, { n: 4, label: "Rounds" }, { n: 5, label: "Config" }]
+    : [{ n: 2, label: "Size" }, { n: 3, label: "Models" }, { n: 4, label: "Rounds" }, { n: 5, label: "Config" }];
+
+  // Map real step numbers to display positions
+  const displayStep = hasWorkflows ? step : step - 1;
+  const totalDisplaySteps = STEPS.length;
 
   return (
     <Dialog open onOpenChange={v => !v && onClose()}>
@@ -195,72 +220,79 @@ function InquiryWizard({
             <GitBranch className="w-4 h-4" />
             Configure your expert team
           </DialogTitle>
-          <DialogDescription className="text-xs truncate">{query.slice(0, 80)}{query.length > 80 ? "…" : ""}</DialogDescription>
+          <DialogDescription className="text-xs truncate">
+            {query.slice(0, 80)}{query.length > 80 ? "…" : ""}
+          </DialogDescription>
         </DialogHeader>
 
-        {/* Step bar */}
+        {/* Step progress bar */}
         <div className="flex items-center gap-1 py-2">
-          {STEPS.map((s, i) => (
-            <div key={s.n} className="flex items-center flex-1">
-              <button
-                onClick={() => step > s.n && setStep(s.n)}
-                className={cn("flex flex-col items-center gap-1 flex-1", step > s.n && "cursor-pointer")}
-              >
-                <StepDot n={s.n} current={step} done={step > s.n} />
-                <span className={cn("text-[10px]", s.n === step ? "text-foreground font-medium" : "text-muted-foreground")}>
-                  {s.label}
-                </span>
-              </button>
-              {i < STEPS.length - 1 && <div className={cn("h-px flex-1 mb-4", step > s.n ? "bg-foreground/30" : "bg-border")} />}
-            </div>
-          ))}
+          {STEPS.map((s, i) => {
+            const isActive = s.n === step;
+            const isDone = s.n < step;
+            return (
+              <div key={s.n} className="flex items-center flex-1">
+                <button
+                  onClick={() => isDone && setStep(s.n)}
+                  className={cn("flex flex-col items-center gap-1 flex-1", isDone && "cursor-pointer")}
+                >
+                  <StepDot n={i + 1} current={isDone ? 0 : isActive ? i + 1 : 99} done={isDone} />
+                  <span className={cn("text-[10px]", isActive ? "text-foreground font-medium" : "text-muted-foreground")}>
+                    {s.label}
+                  </span>
+                </button>
+                {i < STEPS.length - 1 && (
+                  <div className={cn("h-px flex-1 mb-4", isDone ? "bg-foreground/30" : "bg-border")} />
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div className="space-y-4 pt-1">
-          {/* Step 1: Use saved or new */}
+
+          {/* ── Step 1: Saved workflows (only shown when workflows exist) ── */}
           {step === 1 && (
             <div className="space-y-3">
-              <p className="text-sm font-medium text-foreground">Do you want to use a saved workflow?</p>
-              {workflows.length > 0 ? (
-                <div className="space-y-2">
-                  {workflows.map(wf => {
-                    const s = parseSteps(wf.steps);
-                    return (
-                      <button
-                        key={wf.id}
-                        onClick={() => applyWorkflow(wf)}
-                        className="w-full text-left p-3 rounded-lg border border-border hover:border-foreground/30 hover:bg-accent/30 transition-all"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-foreground">{wf.name}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">{s.length} models · {wf.iterations} rounds · temp {wf.temperature?.toFixed(1)}</p>
-                          </div>
-                          {wf.isDefault === 1 && <Star className="w-3.5 h-3.5 text-amber-500 fill-current flex-shrink-0" />}
+              <p className="text-sm font-medium text-foreground">Use a saved workflow, or build a new one.</p>
+              <div className="space-y-2">
+                {workflows.map(wf => {
+                  const s = parseSteps(wf.steps);
+                  return (
+                    <button
+                      key={wf.id}
+                      onClick={() => applyWorkflow(wf)}
+                      className="w-full text-left p-3 rounded-lg border border-border hover:border-foreground/30 hover:bg-accent/30 transition-all"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{wf.name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {s.length} model{s.length !== 1 ? "s" : ""} · {wf.iterations} rounds · temp {wf.temperature?.toFixed(1)}
+                          </p>
                         </div>
-                      </button>
-                    );
-                  })}
-                  <button
-                    onClick={() => { setUseExisting(null); setStep(2); }}
-                    className="w-full flex items-center gap-2 p-3 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" /> Create a new configuration
-                  </button>
-                </div>
-              ) : (
-                <div className="text-center py-6 space-y-3">
-                  <p className="text-sm text-muted-foreground">No saved workflows yet — let's build your first one.</p>
-                  <Button onClick={() => setStep(2)}>Get started <ChevronRight className="ml-1 w-4 h-4" /></Button>
-                </div>
-              )}
+                        {wf.isDefault === 1 && <Star className="w-3.5 h-3.5 text-amber-500 fill-current flex-shrink-0" />}
+                      </div>
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => { setUseExisting(null); setStep(2); }}
+                  className="w-full flex items-center gap-2 p-3 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Build a new configuration
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Step 2: Team size */}
+          {/* ── Step 2: Team size ── */}
           {step === 2 && (
             <div className="space-y-4">
-              <p className="text-sm font-medium text-foreground">How many experts in your team?</p>
+              <div>
+                <p className="text-sm font-medium text-foreground mb-0.5">How many experts in your team?</p>
+                <p className="text-xs text-muted-foreground">More experts = richer debate, higher cost. 3–5 is the sweet spot.</p>
+              </div>
               <div className="grid grid-cols-4 gap-2">
                 {[2, 3, 4, 5, 6, 8, 10, 12].map(n => (
                   <button
@@ -275,17 +307,18 @@ function InquiryWizard({
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">More experts = richer debate but slower & higher cost. 3–5 is the sweet spot.</p>
-              <Button className="w-full" onClick={() => setStep(3)}>Next — Choose models <ChevronRight className="ml-1 w-4 h-4" /></Button>
+              <Button className="w-full" onClick={() => setStep(3)}>
+                Next — Choose models <ChevronRight className="ml-1 w-4 h-4" />
+              </Button>
             </div>
           )}
 
-          {/* Step 3: Pick models */}
+          {/* ── Step 3: Pick models ── */}
           {step === 3 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-foreground">Select {teamSize} model{teamSize !== 1 ? "s" : ""}</p>
-                <span className="text-xs text-muted-foreground">{steps.length}/{teamSize}</span>
+                <span className="text-xs text-muted-foreground">{steps.length} / {teamSize}</span>
               </div>
               <ModelSearch
                 models={models}
@@ -310,17 +343,13 @@ function InquiryWizard({
                   Add {teamSize - steps.length} more model{teamSize - steps.length !== 1 ? "s" : ""}
                 </p>
               )}
-              <Button
-                className="w-full"
-                disabled={steps.length === 0}
-                onClick={() => setStep(4)}
-              >
+              <Button className="w-full" disabled={steps.length === 0} onClick={() => setStep(4)}>
                 Next — Debate rounds <ChevronRight className="ml-1 w-4 h-4" />
               </Button>
             </div>
           )}
 
-          {/* Step 4: Rounds */}
+          {/* ── Step 4: Rounds ── */}
           {step === 4 && (
             <div className="space-y-4">
               <div className="space-y-3">
@@ -333,14 +362,14 @@ function InquiryWizard({
                   <span>5 — Quick</span><span>15 — Balanced</span><span>30 — Deep</span>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">Each round costs ~1 API call per model. 15 rounds × 3 models = 45 calls.</p>
+              <p className="text-xs text-muted-foreground">~1 API call per model per round. 15 rounds × 3 models = 45 calls.</p>
               <Button className="w-full" onClick={() => setStep(5)}>
                 Next — Temperature & consensus <ChevronRight className="ml-1 w-4 h-4" />
               </Button>
             </div>
           )}
 
-          {/* Step 5: Temperature + consensus + save */}
+          {/* ── Step 5: Temperature + consensus + save ── */}
           {step === 5 && (
             <div className="space-y-4">
               {/* Temperature */}
@@ -358,7 +387,7 @@ function InquiryWizard({
                 </div>
               </div>
 
-              {/* Consensus threshold */}
+              {/* Consensus */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -373,35 +402,83 @@ function InquiryWizard({
                 </div>
               </div>
 
-              {/* Summary */}
-              <div className="bg-muted/40 rounded-lg p-3 text-xs space-y-1">
-                <p className="font-medium text-foreground">Summary</p>
-                <p className="text-muted-foreground">{steps.length} model{steps.length !== 1 ? "s" : ""} · {rounds} rounds · temp {temperature.toFixed(1)} · {Math.round(consensusThreshold * 100)}% consensus</p>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {steps.map((s, i) => <Badge key={i} variant="secondary" className="text-xs py-0">{s.label.split(" ").slice(-2).join(" ")}</Badge>)}
+              {/* Summary chip */}
+              <div className="bg-muted/40 rounded-lg p-3 text-xs space-y-1.5">
+                <p className="font-semibold text-foreground">Configuration summary</p>
+                <p className="text-muted-foreground">
+                  {steps.length} model{steps.length !== 1 ? "s" : ""} · {rounds} rounds · temp {temperature.toFixed(1)} · {Math.round(consensusThreshold * 100)}% consensus
+                </p>
+                <div className="flex flex-wrap gap-1 pt-0.5">
+                  {steps.map((s, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs py-0">
+                      {s.label.split(" ").slice(-2).join(" ")}
+                    </Badge>
+                  ))}
                 </div>
               </div>
 
-              {/* Save option */}
+              {/* Save workflow — prominent card, only for new configs */}
               {!useExisting && (
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <Save className="w-3.5 h-3.5" /> Save as workflow <span className="text-muted-foreground font-normal">(optional)</span>
-                  </label>
-                  <Input
-                    placeholder="e.g. Deep Research, Devil's Advocate…"
-                    value={saveName}
-                    onChange={e => setSaveName(e.target.value)}
-                    className="text-sm"
-                  />
+                <div className={cn(
+                  "rounded-xl border transition-all",
+                  wantToSave ? "border-foreground/30 bg-accent/30 p-4" : "border-border p-3"
+                )}>
+                  <div className="flex items-start gap-3">
+                    <div className="pt-0.5">
+                      <button
+                        onClick={() => setWantToSave(!wantToSave)}
+                        className={cn(
+                          "w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all",
+                          wantToSave ? "bg-foreground border-foreground" : "border-muted-foreground hover:border-foreground"
+                        )}
+                      >
+                        {wantToSave && <Check className="w-2.5 h-2.5 text-background" />}
+                      </button>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <button
+                        onClick={() => setWantToSave(!wantToSave)}
+                        className="text-sm font-medium text-foreground text-left"
+                      >
+                        Save this as a workflow
+                      </button>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Reuse this configuration in future inquiries without rebuilding it.
+                      </p>
+                      {wantToSave && (
+                        <Input
+                          autoFocus
+                          className="mt-2.5 text-sm"
+                          placeholder="Give it a name, e.g. Deep Research, Devil's Advocate…"
+                          value={saveName}
+                          onChange={e => setSaveName(e.target.value)}
+                          onKeyDown={e => e.key === "Enter" && saveName.trim() && handleLaunch()}
+                        />
+                      )}
+                    </div>
+                    <Save className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  </div>
                 </div>
               )}
 
-              <Button className="w-full" onClick={handleLaunch} disabled={saving || steps.length === 0}>
-                {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</> : "Launch inquiry →"}
+              <Button
+                className="w-full"
+                onClick={handleLaunch}
+                disabled={saving || steps.length === 0 || (wantToSave && !saveName.trim())}
+              >
+                {saving
+                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving workflow…</>
+                  : "Launch inquiry →"
+                }
               </Button>
+              {wantToSave && !saveName.trim() && (
+                <p className="text-xs text-muted-foreground text-center -mt-2">
+                  Please enter a name for your workflow to continue.
+                </p>
+              )}
             </div>
           )}
+
         </div>
       </DialogContent>
     </Dialog>
@@ -497,7 +574,7 @@ export default function ChatPage() {
           } else if (session.status === "error") {
             clearInterval(poll);
             setQuickMode(null);
-            toast({ title: "Quick answer failed", variant: "destructive" });
+            toast({ title: "Could not generate a quick answer.", description: "Please check your API key in Settings and try again.", variant: "destructive" });
           }
         } catch { /* ignore */ }
       }, 1200);
@@ -529,7 +606,7 @@ export default function ChatPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
       navigate(`/session/${data.sessionId}`);
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Could not launch the inquiry.", description: e.message, variant: "destructive" }),
   });
 
   async function handleSubmit() {
