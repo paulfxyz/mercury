@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.7.1] — 2026-03-30
+
+### Fixed
+- **Unified session tab** — submitting an inquiry now navigates immediately to `/session/:id`. The quick answer, debate starter, full debate, results, follow-ups, and rename/pin all live on that single page. No more separate tabs for the initial answer vs the debate.
+- `chat.tsx` simplified to input-only: fires a quick-answer session and navigates to it. All inquiry state moved to `session.tsx`.
+- `session.tsx` now embeds `DebateStarter` (Quick / Saved / Custom) and the `InquiryWizard` split-panel directly. Launching a debate from the session page creates a new session for the debate and navigates to it.
+
+---
+
 ## [3.7.0] — 2026-03-30
 
 ### Added

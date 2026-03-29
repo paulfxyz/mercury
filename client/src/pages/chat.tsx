@@ -578,18 +578,13 @@ export default function ChatPage() {
     const params = new URLSearchParams(search);
     return params.get("q") ?? "";
   });
-  const [debateMode, setDebateMode] = useState<"idle" | "debate-picker" | "wizard">("idle");
-  const [quickMode, setQuickMode] = useState<null | { sessionId: string; answer: string; loading: boolean }>(null);
-  const [quickLaunching, setQuickLaunching] = useState(false);
-  // Accepted quick answer — shown as context above the follow-up input
-  const [accepted, setAccepted] = useState<{ query: string; answer: string } | null>(null);
+  // All inquiry state lives in /session/:id — chat page is just the input.
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
   const { data: sessions = [] } = useQuery<Session[]>({ queryKey: ["/api/sessions"], staleTime: 5_000 });
-  const { data: workflows = [], isLoading: workflowsLoading } = useQuery<Workflow[]>({ queryKey: ["/api/workflows"] });
   const recentSessions = sessions.slice(0, 6);
 
   // Auto-submit if arriving with a pre-filled ?q= param
@@ -598,13 +593,7 @@ export default function ChatPage() {
     const q = params.get("q");
     if (q?.trim()) {
       setQuery(q);
-      // Small delay so the component is fully mounted
-      const t = setTimeout(() => {
-        setQuickMode(null);
-        setAccepted(null);
-        setDebateMode("idle");
-        quickMutation.mutate(q.trim());
-      }, 80);
+      const t = setTimeout(() => { quickMutation.mutate(q.trim()); }, 80);
       return () => clearTimeout(t);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -623,191 +612,79 @@ export default function ChatPage() {
       return res.json() as Promise<{ sessionId: string }>;
     },
     onSuccess: (data) => {
-      setQuickMode({ sessionId: data.sessionId, answer: "", loading: true });
-      const poll = setInterval(async () => {
-        try {
-          const res = await fetch(`./api/sessions/${data.sessionId}`);
-          const session = await res.json();
-          if (session.status === "completed" && session.quickAnswer) {
-            setQuickMode({ sessionId: data.sessionId, answer: session.quickAnswer, loading: false });
-            clearInterval(poll);
-          } else if (session.status === "error") {
-            clearInterval(poll);
-            setQuickMode(null);
-            toast({ title: "Could not generate a quick answer.", description: "Please check your API key in Settings and try again.", variant: "destructive" });
-          }
-        } catch { /* ignore */ }
-      }, 1200);
-    },
-  });
-
-  const inquireMutation = useMutation({
-    mutationFn: async (cfg: { q: string; selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string }) => {
-      const res = await apiRequest("POST", "/api/inquire", {
-        query: cfg.q, selectedModels: cfg.selectedModels, iterations: cfg.iterations,
-        title: cfg.q.slice(0, 60), workflowId: cfg.workflowId,
-        temperature: cfg.temperature, consensusThreshold: cfg.consensusThreshold,
-      });
-      return res.json() as Promise<{ sessionId: string }>;
-    },
-    onSuccess: (data) => {
+      // Navigate immediately — session page handles the quick answer display,
+      // debate starter, wizard, follow-ups and debate all in one place.
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
       navigate(`/session/${data.sessionId}`);
     },
-    onError: (e: Error) => {
-      setQuickLaunching(false);
-      toast({ title: "Could not launch the inquiry.", description: e.message, variant: "destructive" });
+    onError: () => {
+      toast({ title: "Could not start the inquiry.", description: "Please check your API key in Settings and try again.", variant: "destructive" });
     },
   });
+
 
   function handleSubmit(q?: string) {
     const text = (q ?? query).trim();
     if (!text) return;
     setQuery(text);
-    setQuickMode(null);
-    setDebateMode("idle");
-    setAccepted(null);
     quickMutation.mutate(text);
   }
 
-  function handleWizardLaunch(cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string }) {
-    setDebateMode("idle");
-    inquireMutation.mutate({ q: query.trim(), ...cfg });
-  }
-
-  async function handleQuickLaunch() {
-    setQuickLaunching(true);
-    inquireMutation.mutate({
-      q: query.trim(),
-      selectedModels: QUICK_MODELS,
-      iterations: QUICK_ROUNDS,
-      temperature: QUICK_TEMP,
-      consensusThreshold: QUICK_THRESHOLD,
-    });
-  }
-
-  function handleWorkflowLaunch(wf: Workflow) {
-    const steps = parseSteps(wf.steps);
-    inquireMutation.mutate({
-      q: query.trim(),
-      selectedModels: steps.map(s => s.modelId),
-      iterations: wf.iterations,
-      temperature: wf.temperature ?? 0.7,
-      consensusThreshold: wf.consensusThreshold ?? 0.7,
-      workflowId: wf.id,
-    });
-  }
-
-  function handleAccept() {
-    // Save the answered Q&A as context for follow-up
-    setAccepted({ query: query.trim(), answer: quickMode?.answer ?? "" });
-    setQuickMode(null);
-    setQuery("");
-    setDebateMode("idle");
-  }
-
-  const showWizard = debateMode === "wizard";
-  const isProcessing = quickMutation.isPending || inquireMutation.isPending;
+  const isProcessing = quickMutation.isPending;
 
   return (
     <Layout>
       <div className="flex h-full overflow-hidden">
-
-        {/* ── Left: chat panel ── */}
-        <div className={cn(
-          "flex flex-col h-full transition-all duration-300 ease-in-out",
-          showWizard ? "hidden sm:flex flex-1 min-w-0" : "w-full"
-        )}>
+        <div className="w-full flex flex-col h-full">
           <div className="flex-1 flex flex-col items-center justify-center px-4 py-5 sm:p-6 overflow-y-auto">
-            <div className={cn(
-              "w-full space-y-5 animate-fade-in-up transition-all duration-300",
-              showWizard ? "max-w-xl" : "max-w-2xl"
-            )}>
+            <div className="w-full max-w-2xl space-y-5 animate-fade-in-up">
 
-              {/* Hero — only when truly idle */}
-              {!quickMode && !accepted && !showWizard && (
-                <div className="text-center space-y-2">
-                  <div className="text-3xl sm:text-4xl select-none">☿</div>
-                  <h1 className="text-lg sm:text-xl font-semibold text-foreground">What do you want to inquire?</h1>
-                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                    Every inquiry gets an instant answer, then you can run the full expert debate.
-                  </p>
-                </div>
-              )}
+              {/* Hero */}
+              <div className="text-center space-y-2">
+                <div className="text-3xl sm:text-4xl select-none">☿</div>
+                <h1 className="text-lg sm:text-xl font-semibold text-foreground">What do you want to inquire?</h1>
+                <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                  Every inquiry gets an instant answer, then you can run the full expert debate.
+                </p>
+              </div>
 
-              {/* ── State A: follow-up after accepting quick answer ── */}
-              {accepted && !quickMode && (
-                <FollowUpBar
-                  prevQuery={accepted.query}
-                  prevAnswer={accepted.answer}
-                  onSubmit={handleSubmit}
-                  isProcessing={isProcessing}
+              {/* Input */}
+              <div className={cn(
+                "border border-border rounded-xl shadow-sm bg-card overflow-hidden",
+                "focus-within:ring-2 focus-within:ring-ring/20 focus-within:border-foreground/20"
+              )}>
+                <Textarea
+                  ref={textareaRef}
+                  data-testid="input-query"
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSubmit(); }
+                  }}
+                  placeholder="Ask anything — e.g. What are the strongest arguments for and against UBI?"
+                  className="border-0 shadow-none resize-none focus-visible:ring-0 min-h-[88px] text-sm leading-relaxed bg-transparent px-4 pt-4"
+                  rows={3}
                 />
-              )}
+                <div className="flex items-center justify-between px-4 py-3">
+                  <span className="hidden sm:inline text-xs text-muted-foreground">⌘+Enter to send</span>
+                  <span className="sm:hidden text-xs text-muted-foreground">Tap to send</span>
+                  <Button
+                    data-testid="btn-submit-query"
+                    size="sm"
+                    onClick={() => handleSubmit()}
+                    disabled={!query.trim() || isProcessing}
+                    className="rounded-lg h-8 px-3 gap-1.5"
+                  >
+                    {isProcessing
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Thinking…</>
+                      : <>Inquire <ArrowUp className="w-3.5 h-3.5" /></>
+                    }
+                  </Button>
+                </div>
+              </div>
 
-              {/* ── State B: active inquiry (input + quick answer + debate picker) ── */}
-              {!accepted && (
-                <>
-                  {/* Input box */}
-                  <div className={cn(
-                    "border border-border rounded-xl shadow-sm bg-card overflow-hidden transition-all",
-                    "focus-within:ring-2 focus-within:ring-ring/20 focus-within:border-foreground/20"
-                  )}>
-                    <Textarea
-                      ref={textareaRef}
-                      data-testid="input-query"
-                      value={query}
-                      onChange={e => { setQuery(e.target.value); setQuickMode(null); setDebateMode("idle"); }}
-                      onKeyDown={e => {
-                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSubmit(); }
-                      }}
-                      placeholder="Ask anything — e.g. What are the strongest arguments for and against UBI?"
-                      className="border-0 shadow-none resize-none focus-visible:ring-0 min-h-[88px] text-sm leading-relaxed bg-transparent px-4 pt-4"
-                      rows={3}
-                    />
-                    <div className="flex items-center justify-between px-4 py-3">
-                      <span className="hidden sm:inline text-xs text-muted-foreground">⌘+Enter to send</span>
-                      <span className="sm:hidden text-xs text-muted-foreground">Tap to send</span>
-                      <Button
-                        data-testid="btn-submit-query"
-                        size="sm"
-                        onClick={() => handleSubmit()}
-                        disabled={!query.trim() || isProcessing}
-                        className="rounded-lg h-8 px-3 gap-1.5"
-                      >
-                        {isProcessing
-                          ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Thinking…</>
-                          : <>Inquire <ArrowUp className="w-3.5 h-3.5" /></>
-                        }
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Quick answer */}
-                  {quickMode && (
-                    <QuickAnswerBanner
-                      answer={quickMode.answer}
-                      loading={quickMode.loading}
-                      onAccept={handleAccept}
-                    />
-                  )}
-
-                  {/* Debate starter */}
-                  {quickMode && !quickMode.loading && debateMode !== "wizard" && (
-                    <DebateStarter
-                      workflows={workflows}
-                      workflowsLoading={workflowsLoading}
-                      onQuickLaunch={handleQuickLaunch}
-                      onWorkflowLaunch={handleWorkflowLaunch}
-                      onCustomSetup={() => setDebateMode("wizard")}
-                      launching={quickLaunching || inquireMutation.isPending}
-                    />
-                  )}
-                </>
-              )}
-
-              {/* Recent sessions — only when fully idle */}
-              {!quickMode && !accepted && !showWizard && recentSessions.length > 0 && (
+              {/* Recent sessions */}
+              {recentSessions.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Recent inquiries</p>
                   <div className="grid gap-1.5">
@@ -829,20 +706,6 @@ export default function ChatPage() {
               )}
             </div>
           </div>
-        </div>
-
-        {/* ── Right: wizard panel ── */}
-        <div className={cn(
-          "flex-shrink-0 overflow-hidden transition-all duration-300 ease-out",
-          showWizard ? "w-full sm:w-[480px]" : "w-0 h-0"
-        )}>
-          {showWizard && (
-            <InquiryWizard
-              query={query}
-              onClose={() => setDebateMode("debate-picker")}
-              onLaunch={handleWizardLaunch}
-            />
-          )}
         </div>
       </div>
     </Layout>

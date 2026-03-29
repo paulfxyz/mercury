@@ -5,6 +5,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -13,8 +15,9 @@ import {
   Eye, EyeOff, Loader2, CheckCircle2, AlertTriangle,
   FlaskConical, MessageCircle, Vote, BarChart3, Award, Sparkles, Zap,
   CornerDownRight, ArrowUp, Pin, PinOff, Pencil, Check, X,
+  Bolt, GitBranch, Star, Save, Thermometer, SlidersHorizontal, Search,
 } from "lucide-react";
-import type { Session, Iteration } from "@shared/schema";
+import type { Session, Iteration, Workflow } from "@shared/schema";
 
 interface LiveResponse { modelId: string; modelName: string; content: string; }
 interface LiveIteration {
@@ -26,6 +29,15 @@ interface LiveIteration {
   consensus: number;
 }
 interface FollowUpEntry { query: string; answer: string; createdAt: number; }
+interface ModelOption { id: string; name: string; }
+interface WizardStep { modelId: string; label: string; systemPrompt: string; }
+function parseWizardSteps(raw: string): WizardStep[] { try { return JSON.parse(raw); } catch { return []; } }
+
+// Quick-debate defaults (mirrors chat.tsx)
+const QUICK_MODELS = ["openai/gpt-4o", "anthropic/claude-3.5-sonnet", "google/gemini-2.0-flash-001"];
+const QUICK_ROUNDS = 3;
+const QUICK_TEMP = 0.3;
+const QUICK_THRESHOLD = 0.7;
 
 const PHASE_CFG: Record<string, { icon: React.ElementType; label: string; color: string; bg: string }> = {
   research:  { icon: FlaskConical,  label: "Research",  color: "text-blue-600 dark:text-blue-400",    bg: "bg-blue-50 dark:bg-blue-900/20" },
@@ -53,6 +65,267 @@ function renderMarkdown(md: string): string {
 }
 
 // ─── Phase timeline ──────────────────────────────────────────
+// ─── Model search ────────────────────────────────────────────────
+function ModelSearch({ models, loading, onSelect, placeholder = "Search models…" }: {
+  models: ModelOption[]; loading: boolean; onSelect: (m: ModelOption) => void; placeholder?: string;
+}) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const filtered = models.filter(m => !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.id.toLowerCase().includes(q.toLowerCase())).slice(0, 12);
+  useEffect(() => {
+    function handler(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+        <Input className="pl-9 text-sm" placeholder={placeholder} value={q}
+          onChange={e => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} />
+      </div>
+      {open && (
+        <div className="absolute top-full left-0 right-0 mt-1 border border-border rounded-xl bg-background shadow-2xl z-50 max-h-64 overflow-y-auto">
+          {loading && <div className="px-4 py-3 text-xs text-muted-foreground">Loading models…</div>}
+          {!loading && filtered.length === 0 && <div className="px-4 py-3 text-xs text-muted-foreground">{q ? `No models found for "${q}"` : "Start typing…"}</div>}
+          {filtered.map(m => (
+            <button key={m.id} onMouseDown={e => { e.preventDefault(); onSelect(m); setQ(""); setOpen(false); }}
+              className="w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b border-border/40 last:border-0">
+              <p className="text-sm font-medium text-foreground">{m.name}</p>
+              <p className="text-xs text-muted-foreground">{m.id}</p>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Debate starter ───────────────────────────────────────────
+function DebateStarter({ query, onLaunchDebate, onCustomSetup }: {
+  query: string;
+  onLaunchDebate: (cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string }) => void;
+  onCustomSetup: () => void;
+}) {
+  const { data: workflows = [], isLoading: wfLoading } = useQuery<Workflow[]>({ queryKey: ["/api/workflows"] });
+  const [launching, setLaunching] = useState(false);
+
+  function launch(cfg: Parameters<typeof onLaunchDebate>[0]) { setLaunching(true); onLaunchDebate(cfg); }
+
+  return (
+    <div className="space-y-2.5 animate-fade-in-up">
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">How do you want to run the debate?</p>
+      <button onClick={() => launch({ selectedModels: QUICK_MODELS, iterations: QUICK_ROUNDS, temperature: QUICK_TEMP, consensusThreshold: QUICK_THRESHOLD })}
+        disabled={launching}
+        className={cn("w-full text-left p-4 rounded-xl border border-border hover:border-foreground/30 hover:bg-accent/20 transition-all group flex items-start gap-3.5", launching && "opacity-50 cursor-not-allowed")}>
+        <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <Bolt className="w-4 h-4 text-amber-500" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-foreground">Quick debate</p>
+            <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-medium">Recommended</Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">Top 3 models · {QUICK_ROUNDS} rounds · temp {QUICK_TEMP} — fast and reliable.</p>
+          <div className="flex flex-wrap gap-1 mt-2">
+            {["GPT-4o", "Claude 3.5", "Gemini 2.0"].map(l => <span key={l} className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-medium">{l}</span>)}
+          </div>
+        </div>
+        {launching ? <Loader2 className="w-4 h-4 text-muted-foreground animate-spin flex-shrink-0 mt-1" /> : <ChevronDown className="w-4 h-4 -rotate-90 text-muted-foreground group-hover:text-foreground flex-shrink-0 mt-1 transition-colors" />}
+      </button>
+      {!wfLoading && workflows.length > 0 && (
+        <div className="space-y-1.5">
+          {workflows.map(wf => {
+            const wfSteps = parseWizardSteps(wf.steps);
+            return (
+              <button key={wf.id} onClick={() => launch({ selectedModels: wfSteps.map(s => s.modelId), iterations: wf.iterations, temperature: wf.temperature ?? 0.7, consensusThreshold: wf.consensusThreshold ?? 0.7, workflowId: wf.id })}
+                disabled={launching}
+                className={cn("w-full text-left p-3.5 rounded-xl border border-border hover:border-foreground/30 hover:bg-accent/20 transition-all group flex items-center gap-3", launching && "opacity-50 cursor-not-allowed")}>
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                  {wf.isDefault === 1 ? <Star className="w-3.5 h-3.5 text-amber-500 fill-current" /> : <GitBranch className="w-3.5 h-3.5 text-muted-foreground" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">{wf.name}</p>
+                  <p className="text-xs text-muted-foreground">{wfSteps.length} model{wfSteps.length !== 1 ? "s" : ""} · {wf.iterations} rounds</p>
+                </div>
+                <ChevronDown className="w-4 h-4 -rotate-90 text-muted-foreground group-hover:text-foreground flex-shrink-0 transition-colors" />
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <button onClick={onCustomSetup} disabled={launching}
+        className={cn("w-full text-left p-3.5 rounded-xl border border-dashed border-border hover:border-foreground/30 hover:bg-accent/10 transition-all group flex items-center gap-3", launching && "opacity-50 cursor-not-allowed")}>
+        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+          <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-foreground">Custom setup</p>
+          <p className="text-xs text-muted-foreground">Choose models, rounds, temperature and more.</p>
+        </div>
+        <ChevronDown className="w-4 h-4 -rotate-90 text-muted-foreground group-hover:text-foreground flex-shrink-0 transition-colors" />
+      </button>
+    </div>
+  );
+}
+
+// ─── Inquiry wizard (split-panel) ─────────────────────────────
+function InquiryWizard({ query, onClose, onLaunch }: {
+  query: string; onClose: () => void;
+  onLaunch: (cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string }) => void;
+}) {
+  const { data: workflows = [] } = useQuery<Workflow[]>({ queryKey: ["/api/workflows"] });
+  const { data: models = [], isLoading: modelsLoading } = useQuery<ModelOption[]>({ queryKey: ["/api/models"], staleTime: 60_000 });
+  const { toast } = useToast();
+  const [step, setStep] = useState(1);
+  const [teamSize, setTeamSize] = useState(3);
+  const [wSteps, setWSteps] = useState<WizardStep[]>([]);
+  const [rounds, setRounds] = useState(15);
+  const [temperature, setTemperature] = useState(0.7);
+  const [threshold, setThreshold] = useState(0.7);
+  const [wantToSave, setWantToSave] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { bodyRef.current?.scrollTo(0, 0); }, [step]);
+
+  function addModel(m: ModelOption) { if (wSteps.length < teamSize) setWSteps(prev => [...prev, { modelId: m.id, label: m.name, systemPrompt: "" }]); }
+  function removeModel(i: number) { setWSteps(prev => prev.filter((_, j) => j !== i)); }
+  function updatePrompt(i: number, v: string) { setWSteps(prev => prev.map((s, j) => j === i ? { ...s, systemPrompt: v } : s)); }
+
+  async function handleLaunch() {
+    if (!wSteps.length) { toast({ title: "Please add at least one model.", variant: "destructive" }); return; }
+    let workflowId: string | undefined;
+    if (wantToSave && saveName.trim()) {
+      setSaving(true);
+      try {
+        const res = await apiRequest("POST", "/api/workflows", { name: saveName.trim(), steps: wSteps, iterations: rounds, temperature, consensusThreshold: threshold, isDefault: workflows.length === 0 });
+        const wf = await res.json(); workflowId = wf.id;
+        await queryClient.invalidateQueries({ queryKey: ["/api/workflows"] });
+        toast({ title: `Workflow "${saveName.trim()}" saved.` });
+      } catch { toast({ title: "Could not save workflow.", variant: "destructive" }); }
+      setSaving(false);
+    }
+    onLaunch({ selectedModels: wSteps.map(s => s.modelId), iterations: rounds, temperature, consensusThreshold: threshold, workflowId });
+  }
+
+  const WSTEPS = [{ n: 1, label: "Size" }, { n: 2, label: "Models" }, { n: 3, label: "Rounds" }, { n: 4, label: "Config" }];
+  return (
+    <div className="flex flex-col h-full w-full max-w-xl border-l border-border bg-background">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
+        <div className="flex items-center gap-2.5">
+          <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
+          <div><p className="text-sm font-semibold text-foreground">Custom setup</p><p className="text-xs text-muted-foreground truncate max-w-xs">{query.slice(0, 60)}{query.length > 60 ? "…" : ""}</p></div>
+        </div>
+        <button onClick={onClose} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"><X className="w-4 h-4" /></button>
+      </div>
+      <div className="flex items-center gap-1 px-5 py-3 border-b border-border flex-shrink-0">
+        {WSTEPS.map((s, i) => {
+          const isActive = s.n === step, isDone = s.n < step;
+          return (
+            <div key={s.n} className="flex items-center flex-1">
+              <button onClick={() => isDone && setStep(s.n)} className={cn("flex flex-col items-center gap-1 flex-1", isDone && "cursor-pointer")}>
+                <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 transition-all",
+                  isDone ? "bg-foreground text-background" : isActive ? "border-2 border-foreground text-foreground" : "border border-border text-muted-foreground")}>
+                  {isDone ? <Check className="w-3 h-3" /> : i + 1}
+                </div>
+                <span className={cn("text-[10px]", isActive ? "text-foreground font-medium" : "text-muted-foreground")}>{s.label}</span>
+              </button>
+              {i < WSTEPS.length - 1 && <div className={cn("h-px flex-1 mb-4 mx-0.5", isDone ? "bg-foreground/30" : "bg-border")} />}
+            </div>
+          );
+        })}
+      </div>
+      <div ref={bodyRef} className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+        {step === 1 && (
+          <div className="space-y-4">
+            <p className="text-sm font-medium text-foreground">How many experts in your team?</p>
+            <div className="grid grid-cols-4 gap-2">
+              {[2,3,4,5,6,8,10,12].map(n => (
+                <button key={n} onClick={() => setTeamSize(n)} className={cn("py-3 rounded-xl border text-sm font-semibold transition-all",
+                  teamSize === n ? "bg-foreground text-background border-foreground" : "border-border text-foreground hover:border-foreground/40")}>{n}</button>
+              ))}
+            </div>
+            <Button className="w-full" onClick={() => setStep(2)}>Choose models <ChevronDown className="ml-1 w-4 h-4 -rotate-90" /></Button>
+          </div>
+        )}
+        {step === 2 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-foreground">Select {teamSize} model{teamSize !== 1 ? "s" : ""}</p>
+              <span className="text-xs text-muted-foreground tabular-nums">{wSteps.length} / {teamSize}</span>
+            </div>
+            <ModelSearch models={models} loading={modelsLoading} onSelect={addModel}
+              placeholder={wSteps.length < teamSize ? `Add expert ${wSteps.length + 1} of ${teamSize}…` : "Team complete"} />
+            <div className="space-y-2">
+              {wSteps.map((s, i) => (
+                <div key={i} className="border border-border rounded-xl bg-card overflow-hidden">
+                  <div className="flex items-center gap-3 px-3.5 py-2.5">
+                    <div className="w-5 h-5 rounded-full bg-foreground text-background text-[11px] flex items-center justify-center font-bold flex-shrink-0">{i+1}</div>
+                    <div className="flex-1 min-w-0"><p className="text-sm font-medium text-foreground truncate">{s.label}</p><p className="text-xs text-muted-foreground truncate">{s.modelId}</p></div>
+                    <button onClick={() => removeModel(i)} className="text-muted-foreground hover:text-destructive transition-colors p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </div>
+                  <div className="px-3.5 pb-3 pt-2 border-t border-border/40">
+                    <Textarea placeholder={`Role for ${s.label.split(" ")[0]}…`} value={s.systemPrompt} onChange={e => updatePrompt(i, e.target.value)}
+                      className="text-xs resize-none bg-transparent border-0 shadow-none focus-visible:ring-0 p-0 placeholder:text-muted-foreground/50 min-h-[2rem]" rows={2} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Button className="w-full" disabled={wSteps.length === 0} onClick={() => setStep(3)}>Set rounds <ChevronDown className="ml-1 w-4 h-4 -rotate-90" /></Button>
+          </div>
+        )}
+        {step === 3 && (
+          <div className="space-y-5">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between"><p className="text-sm font-medium text-foreground">Debate rounds</p><span className="text-sm font-mono font-bold text-foreground">{rounds}</span></div>
+              <input type="range" min={5} max={30} value={rounds} onChange={e => setRounds(+e.target.value)} className="w-full accent-foreground" />
+              <div className="flex justify-between text-xs text-muted-foreground"><span>5 — Quick</span><span>15 — Balanced</span><span>30 — Deep</span></div>
+            </div>
+            <Button className="w-full" onClick={() => setStep(4)}>Temperature &amp; consensus <ChevronDown className="ml-1 w-4 h-4 -rotate-90" /></Button>
+          </div>
+        )}
+        {step === 4 && (
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2"><Thermometer className="w-3.5 h-3.5 text-muted-foreground" /><p className="text-sm font-medium text-foreground">Temperature</p></div>
+                <span className="text-sm font-mono font-bold text-foreground">{temperature.toFixed(1)}</span>
+              </div>
+              <input type="range" min={0} max={1} step={0.1} value={temperature} onChange={e => setTemperature(+e.target.value)} className="w-full accent-foreground" />
+              <div className="flex justify-between text-xs text-muted-foreground"><span>0 — Precise</span><span>0.7 — Balanced</span><span>1 — Creative</span></div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-muted-foreground" /><p className="text-sm font-medium text-foreground">Required consensus</p></div>
+                <span className="text-sm font-mono font-bold text-foreground">{Math.round(threshold * 100)}%</span>
+              </div>
+              <input type="range" min={0.5} max={1} step={0.05} value={threshold} onChange={e => setThreshold(+e.target.value)} className="w-full accent-foreground" />
+              <div className="flex justify-between text-xs text-muted-foreground"><span>50% — Loose</span><span>70% — Standard</span><span>100% — Strict</span></div>
+            </div>
+            <div className={cn("rounded-xl border transition-all", wantToSave ? "border-foreground/30 bg-accent/30 p-4" : "border-border p-3.5")}>
+              <div className="flex items-start gap-3">
+                <button onClick={() => setWantToSave(!wantToSave)} className={cn("w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all mt-0.5", wantToSave ? "bg-foreground border-foreground" : "border-muted-foreground hover:border-foreground")}>
+                  {wantToSave && <Check className="w-2.5 h-2.5 text-background" />}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <button onClick={() => setWantToSave(!wantToSave)} className="text-sm font-medium text-foreground text-left">Save as a workflow</button>
+                  {wantToSave && <Input autoFocus className="mt-2 text-sm" placeholder="Name it…" value={saveName} onChange={e => setSaveName(e.target.value)} onKeyDown={e => e.key === "Enter" && saveName.trim() && handleLaunch()} />}
+                </div>
+                <Save className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+              </div>
+            </div>
+            <Button className="w-full" onClick={handleLaunch} disabled={saving || wSteps.length === 0 || (wantToSave && !saveName.trim())}>
+              {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</> : "Launch inquiry →"}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PhaseTimeline({ currentPhase }: { currentPhase: string }) {
   const idx = PHASES.indexOf(currentPhase);
   return (
@@ -358,6 +631,8 @@ export default function SessionPage() {
   const [liveIters, setLiveIters] = useState<LiveIteration[]>([]);
   const [currentPhase, setCurrentPhase] = useState("research");
   const [showLive, setShowLive] = useState(true);
+  // Debate starter / wizard state (shown after quick answer)
+  const [showWizard, setShowWizard] = useState(false);
 
   // Pending follow-up (being generated)
   const [pendingFollowUp, setPendingFollowUp] = useState<string | null>(null);
@@ -377,6 +652,23 @@ export default function SessionPage() {
     queryKey: ["/api/sessions", id, "iterations"],
     enabled: !!id,
     refetchInterval: () => session?.status === "running" ? 3000 : false,
+  });
+
+  // Launch a full debate from this session page
+  const debateMutation = useMutation({
+    mutationFn: async (cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string }) => {
+      const res = await apiRequest("POST", "/api/inquire", {
+        query: session?.query ?? "",
+        title: session?.title ?? (session?.query ?? "").slice(0, 60),
+        ...cfg,
+      });
+      return res.json() as Promise<{ sessionId: string }>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      navigate(`/session/${data.sessionId}`);
+    },
+    onError: () => toast({ title: "Could not launch the debate.", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -491,7 +783,9 @@ export default function SessionPage() {
 
   return (
     <Layout>
-      <div className="h-full overflow-y-auto">
+      <div className="flex h-full overflow-hidden">
+        {/* Main content */}
+        <div className={cn("flex-1 h-full overflow-y-auto min-w-0 transition-all duration-300", showWizard && "hidden sm:block")}>
         <div className="max-w-2xl mx-auto px-4 py-6 pb-12 space-y-5">
 
           {/* ── Header ── */}
@@ -658,6 +952,15 @@ export default function SessionPage() {
           {/* Results */}
           {isCompleted && <Results session={session} iterations={storedIters} isQuick={isQuick} />}
 
+          {/* ── Debate starter — shown after quick answer, before any debate launched ── */}
+          {isCompleted && isQuick && storedIters.length === 0 && followUps.length === 0 && !showWizard && (
+            <DebateStarter
+              query={session.query}
+              onLaunchDebate={cfg => debateMutation.mutate(cfg)}
+              onCustomSetup={() => setShowWizard(true)}
+            />
+          )}
+
           {/* ── Follow-up thread ── */}
           {followUps.map((fu, i) => (
             <FollowUpEntryCard key={fu.createdAt} entry={fu} idx={i} />
@@ -705,6 +1008,21 @@ export default function SessionPage() {
           )}
 
           <div ref={bottomRef} />
+        </div>
+        </div>{/* end main content */}
+
+        {/* Wizard panel — slides in from right */}
+        <div className={cn(
+          "flex-shrink-0 overflow-hidden transition-all duration-300 ease-out",
+          showWizard ? "w-full sm:w-[480px]" : "w-0"
+        )}>
+          {showWizard && session && (
+            <InquiryWizard
+              query={session.query}
+              onClose={() => setShowWizard(false)}
+              onLaunch={cfg => { setShowWizard(false); debateMutation.mutate(cfg); }}
+            />
+          )}
         </div>
       </div>
     </Layout>
