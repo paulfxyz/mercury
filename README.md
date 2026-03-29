@@ -531,7 +531,7 @@ Current: **v3.4.1** — debate starter (Quick debate / saved workflow / custom s
 
 - [paulfleury.com](https://paulfleury.com)
 - GitHub: [@paulfxyz](https://github.com/paulfxyz)
-- [Openline](https://openline.ai) — instant eSIMs in 190+ countries
+- [Openline](https://openline.com) — instant eSIMs in 190+ countries
 
 Other projects: [mang.sh](https://mang.sh) · [ase.so](https://ase.so)
 
