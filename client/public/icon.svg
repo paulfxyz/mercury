@@ -1,6 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2000 2000" width="2000" height="2000">
-  <!-- Background -->
-  <rect width="2000" height="2000" fill="#0a0a0a"/>
-  <!-- M glyph — geometric, filled, white -->
-  <polygon points="310.00,310.00 446.00,310.00 1068.00,1110.40 1554.00,310.00 1690.00,310.00 1690.00,1690.00 1554.00,1690.00 1554.00,452.80 1000.00,1253.20 446.00,452.80 446.00,1690.00 310.00,1690.00" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 500 500" width="500" height="500">
+
+  <rect width="500" height="500" fill="#0a0a0a"/>
+
+  <g fill="none" stroke="#ffffff" stroke-width="25.00"
+     stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- Crescent: semicircle arc, sweep-flag=1 → clockwise = arcs UPWARD -->
+    <path d="M 192.50,162.50
+             A 57.50,57.50 0 0,1
+               307.50,162.50"/>
+
+    <!-- Circle with gap below crescent -->
+    <circle cx="250.00" cy="240.00" r="57.50"/>
+
+    <!-- Vertical stem -->
+    <line x1="250.00" y1="297.50"
+          x2="250.00" y2="407.50"/>
+
+    <!-- Crossbar -->
+    <line x1="183.88" y1="343.70"
+          x2="316.12" y2="343.70"/>
+
+  </g>
 </svg>
