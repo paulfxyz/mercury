@@ -7,7 +7,7 @@
 *Every inquiry gets an immediate answer. Then an expert panel of AI models debates, challenges, and votes until they agree.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-3.4.1-brightgreen?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-3.5.0-brightgreen?style=for-the-badge)](CHANGELOG.md)
 [![Built with TypeScript](https://img.shields.io/badge/Built%20with-TypeScript-3178c6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Powered by OpenRouter](https://img.shields.io/badge/Powered%20by-OpenRouter-6c47ff?style=for-the-badge)](https://openrouter.ai)
 [![Deploy on Fly.io](https://img.shields.io/badge/Deploy%20on-Fly.io-7c3aed?style=for-the-badge&logo=flydotio&logoColor=white)](https://fly.io)
@@ -30,7 +30,7 @@
   ║                                                          ║
   ║   Submit → Initial answer → Debate → Consensus           ║
   ║                                                          ║
-  ║   v3.4.1  ·  mercury.sh  ·  github.com/paulfxyz          ║
+  ║   v3.5.0  ·  mercury.sh  ·  github.com/paulfxyz          ║
   ╚══════════════════════════════════════════════════════════╝
 ```
 
@@ -521,7 +521,7 @@ Key insight: **diversity beats raw capability**. Three different mid-tier models
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
-Current: **v3.4.1** — debate starter (Quick debate / saved workflow / custom setup), split-panel wizard, model selection fixed, version-stamped releases.
+Current: **v3.5.0** — debate starter (Quick debate / saved workflow / custom setup), split-panel wizard, model selection fixed, version-stamped releases.
 
 ---
 

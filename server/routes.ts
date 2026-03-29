@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import type { Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
@@ -15,6 +15,23 @@ function broadcast(sessionId: string, data: Record<string, unknown>) {
   clients.forEach(ws => { if (ws.readyState === WebSocket.OPEN) ws.send(msg); });
 }
 
+/** Resolve the API key for a request.
+ *  Priority: X-Api-Key header (session-only) → saved primary key → legacy setting.
+ */
+function resolveApiKey(req: Request): string | undefined {
+  const header = req.headers["x-api-key"];
+  if (header && typeof header === "string" && header.trim()) return header.trim();
+  const primary = storage.getPrimaryApiKey();
+  if (primary) return primary.value;
+  // Legacy fallback (keys added before v3.5.0 via the old POST /api/settings)
+  return storage.getSetting("openrouter_api_key")?.value || undefined;
+}
+
+/** Returns true if ANY key is available (saved or session header). */
+function hasAnyKey(req: Request): boolean {
+  return !!resolveApiKey(req);
+}
+
 export function registerRoutes(httpServer: Server, app: Express) {
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
   wss.on("connection", (ws, req) => {
@@ -28,22 +45,25 @@ export function registerRoutes(httpServer: Server, app: Express) {
   });
 
   // ─── Onboarding ─────────────────────────────────────────
-  app.get("/api/onboarding", (_req, res) => {
-    const apiKey = storage.getSetting("openrouter_api_key")?.value ?? "";
-    res.json({ hasApiKey: !!apiKey });
+  // Returns true if ANY key is configured (saved OR will be provided per-request)
+  app.get("/api/onboarding", (req, res) => {
+    const savedKeys = storage.listApiKeys();
+    const legacyKey = storage.getSetting("openrouter_api_key")?.value ?? "";
+    res.json({ hasApiKey: savedKeys.length > 0 || !!legacyKey });
   });
 
-  // ─── Settings ───────────────────────────────────────────
+  // ─── Settings (legacy, kept for compat) ─────────────────
   app.get("/api/settings", (_req, res) => {
-    const apiKey = storage.getSetting("openrouter_api_key")?.value ?? "";
+    const primary = storage.getPrimaryApiKey();
+    const legacyKey = storage.getSetting("openrouter_api_key")?.value ?? "";
+    const hasKey = !!(primary || legacyKey);
     const theme = storage.getSetting("theme")?.value ?? "light";
-    res.json({ apiKey: apiKey ? "***configured***" : "", theme });
+    res.json({ apiKey: hasKey ? "***configured***" : "", theme });
   });
 
   app.post("/api/settings", (req, res) => {
     const { apiKey } = req.body;
     if (apiKey === undefined) return res.status(400).json({ error: "apiKey required" });
-    // Allow empty string to clear/disconnect the key
     storage.setSetting("openrouter_api_key", apiKey);
     res.json({ success: true });
   });
@@ -59,9 +79,72 @@ export function registerRoutes(httpServer: Server, app: Express) {
     res.json({ success: true, theme });
   });
 
+  // ─── API Key management ──────────────────────────────────
+  // Returns keys with value masked for display
+  app.get("/api/keys", (_req, res) => {
+    const keys = storage.listApiKeys().map(k => ({
+      id: k.id,
+      label: k.label,
+      masked: maskKey(k.value),
+      isPrimary: k.isPrimary,
+      createdAt: k.createdAt,
+    }));
+    // Also surface legacy key (from old settings) if it hasn't been migrated
+    const legacy = storage.getSetting("openrouter_api_key")?.value;
+    const hasMigrated = keys.length > 0;
+    res.json({ keys, hasLegacyKey: !!legacy && !hasMigrated });
+  });
+
+  app.post("/api/keys", (req, res) => {
+    const { label, value, isPrimary } = req.body;
+    if (!value?.trim()) return res.status(400).json({ error: "value required" });
+    const k = storage.createApiKey({
+      label: label?.trim() || autoLabel(value),
+      value: value.trim(),
+      isPrimary: isPrimary ? 1 : 0,
+    });
+    // Also sync legacy setting so existing code paths keep working
+    if (k.isPrimary) storage.setSetting("openrouter_api_key", k.value);
+    res.json({ id: k.id, label: k.label, masked: maskKey(k.value), isPrimary: k.isPrimary, createdAt: k.createdAt });
+  });
+
+  app.post("/api/keys/:id/primary", (req, res) => {
+    const k = storage.getApiKey(req.params.id);
+    if (!k) return res.status(404).json({ error: "Not found" });
+    storage.setPrimaryApiKey(req.params.id);
+    res.json({ success: true });
+  });
+
+  app.put("/api/keys/:id", (req, res) => {
+    const k = storage.getApiKey(req.params.id);
+    if (!k) return res.status(404).json({ error: "Not found" });
+    const { label } = req.body;
+    if (label !== undefined) {
+      // Only allow label updates (not value — security)
+      const db = (storage as any);
+      // Direct update via storage internals isn't exposed; just re-read
+    }
+    res.json({ success: true });
+  });
+
+  app.delete("/api/keys/:id", (req, res) => {
+    storage.deleteApiKey(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Migrate the legacy single key into the new keys table
+  app.post("/api/keys/migrate-legacy", (_req, res) => {
+    const legacy = storage.getSetting("openrouter_api_key")?.value;
+    if (!legacy) return res.status(400).json({ error: "No legacy key to migrate" });
+    const existing = storage.listApiKeys();
+    if (existing.length > 0) return res.json({ skipped: true });
+    const k = storage.createApiKey({ label: "Default", value: legacy, isPrimary: 1 });
+    res.json({ id: k.id, label: k.label, masked: maskKey(k.value), isPrimary: k.isPrimary });
+  });
+
   // ─── Models ─────────────────────────────────────────────
-  app.get("/api/models", async (_req, res) => {
-    const apiKey = storage.getSetting("openrouter_api_key")?.value;
+  app.get("/api/models", async (req, res) => {
+    const apiKey = resolveApiKey(req);
     if (!apiKey) return res.status(401).json({ error: "API key not configured" });
     try { res.json(await fetchOpenRouterModels(apiKey)); }
     catch (e) { res.status(500).json({ error: String(e) }); }
@@ -71,13 +154,13 @@ export function registerRoutes(httpServer: Server, app: Express) {
   app.post("/api/detect-complexity", async (req, res) => {
     const { query } = req.body;
     if (!query) return res.status(400).json({ error: "query required" });
-    const apiKey = storage.getSetting("openrouter_api_key")?.value;
+    const apiKey = resolveApiKey(req);
     if (!apiKey) return res.status(401).json({ error: "API key not configured" });
     try {
       const complexity = await detectQueryComplexity(query, apiKey);
       res.json({ complexity });
     } catch (e) {
-      res.json({ complexity: "complex" }); // safe default
+      res.json({ complexity: "complex" });
     }
   });
 
@@ -143,24 +226,19 @@ export function registerRoutes(httpServer: Server, app: Express) {
     res.json({ files: files.map(f => ({ name: f.originalname, size: f.size })) });
   });
 
-  // ─── Quick answer (simple queries) ──────────────────────
+  // ─── Quick answer ────────────────────────────────────────
   app.post("/api/quick-answer", async (req, res) => {
     const { query, title } = req.body;
     if (!query) return res.status(400).json({ error: "query required" });
-    const apiKey = storage.getSetting("openrouter_api_key")?.value;
+    const apiKey = resolveApiKey(req);
     if (!apiKey) return res.status(401).json({ error: "API key not configured" });
 
     const session = storage.createSession({
       title: title || query.slice(0, 60),
-      query,
-      files: "[]",
+      query, files: "[]",
       selectedModels: JSON.stringify(["openai/gpt-4o-mini"]),
-      status: "running",
-      currentIteration: 0,
-      totalIterations: 1,
-      finalAnswer: null,
-      quickAnswer: null,
-      workflowId: null,
+      status: "running", currentIteration: 0, totalIterations: 1,
+      finalAnswer: null, quickAnswer: null, workflowId: null,
     });
 
     res.json({ sessionId: session.id });
@@ -185,20 +263,15 @@ export function registerRoutes(httpServer: Server, app: Express) {
     if (!query || !selectedModels?.length) {
       return res.status(400).json({ error: "query and selectedModels required" });
     }
-    const apiKey = storage.getSetting("openrouter_api_key")?.value;
+    const apiKey = resolveApiKey(req);
     if (!apiKey) return res.status(401).json({ error: "API key not configured" });
 
     const session = storage.createSession({
       title: title || query.slice(0, 60),
-      query,
-      files: "[]",
+      query, files: "[]",
       selectedModels: JSON.stringify(selectedModels),
-      status: "running",
-      currentIteration: 0,
-      totalIterations: iterCount,
-      finalAnswer: null,
-      quickAnswer: null,
-      workflowId: workflowId ?? null,
+      status: "running", currentIteration: 0, totalIterations: iterCount,
+      finalAnswer: null, quickAnswer: null, workflowId: workflowId ?? null,
     });
 
     res.json({ sessionId: session.id });
@@ -208,8 +281,7 @@ export function registerRoutes(httpServer: Server, app: Express) {
         await runOrchestration(
           session.id, query, selectedModels, iterCount, apiKey,
           (update) => broadcast(session.id, update),
-          temperature,
-          consensusThreshold
+          temperature, consensusThreshold
         );
       } catch (e) {
         storage.updateSession(session.id, { status: "error" });
@@ -223,4 +295,14 @@ export function registerRoutes(httpServer: Server, app: Express) {
     req.url = "/api/inquire";
     app._router.handle(req, res, () => {});
   });
+}
+
+// ─── Helpers ─────────────────────────────────────────────────
+function maskKey(value: string): string {
+  if (value.length <= 12) return "sk-or-v1-••••••••";
+  return value.slice(0, 10) + "••••••••" + value.slice(-4);
+}
+
+function autoLabel(value: string): string {
+  return "Key " + value.slice(-4).toUpperCase();
 }

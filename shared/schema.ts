@@ -45,6 +45,18 @@ export const insertSettingSchema = createInsertSchema(settings);
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
 export type Setting = typeof settings.$inferSelect;
 
+// ─── API Keys ────────────────────────────────────────────────
+export const apiKeys = sqliteTable("api_keys", {
+  id: text("id").primaryKey(),
+  label: text("label").notNull(),
+  value: text("value").notNull(),
+  isPrimary: integer("is_primary").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+});
+export const insertApiKeySchema = createInsertSchema(apiKeys).omit({ id: true, createdAt: true });
+export type InsertApiKey = z.infer<typeof insertApiKeySchema>;
+export type ApiKey = typeof apiKeys.$inferSelect;
+
 // ─── Workflows ───────────────────────────────────────────────
 export const workflows = sqliteTable("workflows", {
   id: text("id").primaryKey(),

@@ -2,9 +2,9 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import { eq, desc } from "drizzle-orm";
 import {
-  sessions, iterations, settings, workflows,
-  type Session, type Iteration, type Setting, type Workflow,
-  type InsertSession, type InsertIteration, type InsertSetting, type InsertWorkflow,
+  sessions, iterations, settings, workflows, apiKeys,
+  type Session, type Iteration, type Setting, type Workflow, type ApiKey,
+  type InsertSession, type InsertIteration, type InsertSetting, type InsertWorkflow, type InsertApiKey,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -56,6 +56,14 @@ sqlite.exec(`
     is_default INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS api_keys (
+    id TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    value TEXT NOT NULL,
+    is_primary INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );
 `);
 
 // Safe migrations
@@ -88,6 +96,14 @@ export interface IStorage {
   listWorkflows(): Workflow[];
   updateWorkflow(id: string, data: Partial<Workflow>): Workflow | undefined;
   deleteWorkflow(id: string): void;
+
+  // API Keys
+  createApiKey(data: InsertApiKey): ApiKey;
+  getApiKey(id: string): ApiKey | undefined;
+  listApiKeys(): ApiKey[];
+  setPrimaryApiKey(id: string): void;
+  deleteApiKey(id: string): void;
+  getPrimaryApiKey(): ApiKey | undefined;
 }
 
 export const storage: IStorage = {
@@ -142,4 +158,51 @@ export const storage: IStorage = {
     return db.select().from(workflows).where(eq(workflows.id, id)).get();
   },
   deleteWorkflow(id) { db.delete(workflows).where(eq(workflows.id, id)).run(); },
+
+  // ─── API Keys ───────────────────────────────────────────
+  createApiKey(data) {
+    // If this is the first key, make it primary
+    const existing = db.select().from(apiKeys).all();
+    const shouldBePrimary = existing.length === 0 ? 1 : (data.isPrimary ? 1 : 0);
+    if (shouldBePrimary) {
+      // demote all others
+      db.update(apiKeys).set({ isPrimary: 0 }).run();
+    }
+    const k = { ...data, id: randomUUID(), isPrimary: shouldBePrimary, createdAt: Date.now() };
+    db.insert(apiKeys).values(k as any).run();
+    return db.select().from(apiKeys).where(eq(apiKeys.id, k.id)).get()!;
+  },
+  getApiKey(id) { return db.select().from(apiKeys).where(eq(apiKeys.id, id)).get(); },
+  listApiKeys() { return db.select().from(apiKeys).orderBy(desc(apiKeys.createdAt)).all(); },
+  setPrimaryApiKey(id) {
+    db.update(apiKeys).set({ isPrimary: 0 }).run();
+    db.update(apiKeys).set({ isPrimary: 1 }).where(eq(apiKeys.id, id)).run();
+    // Also sync the legacy settings key for backwards compat
+    const k = db.select().from(apiKeys).where(eq(apiKeys.id, id)).get();
+    if (k) {
+      const ex = db.select().from(settings).where(eq(settings.key, "openrouter_api_key")).get();
+      if (ex) db.update(settings).set({ value: k.value }).where(eq(settings.key, "openrouter_api_key")).run();
+      else db.insert(settings).values({ key: "openrouter_api_key", value: k.value }).run();
+    }
+  },
+  deleteApiKey(id) {
+    const k = db.select().from(apiKeys).where(eq(apiKeys.id, id)).get();
+    db.delete(apiKeys).where(eq(apiKeys.id, id)).run();
+    // If deleted key was primary, promote the most recent remaining key
+    if (k?.isPrimary) {
+      const next = db.select().from(apiKeys).orderBy(desc(apiKeys.createdAt)).get();
+      if (next) {
+        db.update(apiKeys).set({ isPrimary: 1 }).where(eq(apiKeys.id, next.id)).run();
+        const ex = db.select().from(settings).where(eq(settings.key, "openrouter_api_key")).get();
+        if (ex) db.update(settings).set({ value: next.value }).where(eq(settings.key, "openrouter_api_key")).run();
+        else db.insert(settings).values({ key: "openrouter_api_key", value: next.value }).run();
+      } else {
+        // No keys left — clear the legacy setting
+        db.delete(settings).where(eq(settings.key, "openrouter_api_key")).run();
+      }
+    }
+  },
+  getPrimaryApiKey() {
+    return db.select().from(apiKeys).where(eq(apiKeys.isPrimary, 1)).get();
+  },
 };

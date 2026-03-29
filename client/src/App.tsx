@@ -1,7 +1,7 @@
 import { Switch, Route, Router, useLocation } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, setSessionKey, getSessionKey } from "@/lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 
@@ -50,9 +50,35 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
   return <ThemeContext.Provider value={{ theme, toggle, set }}>{children}</ThemeContext.Provider>;
 }
 
-// ─── Guard: API key only ─────────────────────────────────────
+// ─── Session key context ──────────────────────────────────────
+interface SessionKeyCtx {
+  sessionKey: string | null;
+  setKey: (k: string | null) => void;
+}
+const SessionKeyContext = createContext<SessionKeyCtx>({ sessionKey: null, setKey: () => {} });
+export const useSessionKey = () => useContext(SessionKeyContext);
+
+function SessionKeyProvider({ children }: { children: React.ReactNode }) {
+  const [sessionKey, setKeyState] = useState<string | null>(null);
+
+  const setKey = useCallback((k: string | null) => {
+    setKeyState(k);
+    setSessionKey(k); // propagate to queryClient headers
+    // Invalidate all queries so they re-run with the new key
+    queryClient.invalidateQueries();
+  }, []);
+
+  return (
+    <SessionKeyContext.Provider value={{ sessionKey, setKey }}>
+      {children}
+    </SessionKeyContext.Provider>
+  );
+}
+
+// ─── Guard ───────────────────────────────────────────────────
 function AppRouter() {
   const [location, navigate] = useLocation();
+  const { sessionKey } = useSessionKey();
 
   const { data: ob, isLoading } = useQuery<{ hasApiKey: boolean }>({
     queryKey: ["/api/onboarding"],
@@ -63,12 +89,14 @@ function AppRouter() {
   useEffect(() => {
     if (isLoading || !ob) return;
     const atOnboarding = location.startsWith("/onboarding");
-    if (!ob.hasApiKey) {
+    // Has access if: server has a saved key OR a session key is active
+    const hasAccess = ob.hasApiKey || !!sessionKey;
+    if (!hasAccess) {
       if (!atOnboarding) navigate("/onboarding");
     } else {
       if (location === "/" || atOnboarding) navigate("/chat");
     }
-  }, [ob, isLoading, location]);
+  }, [ob, isLoading, location, sessionKey]);
 
   if (isLoading) return (
     <div className="h-screen flex items-center justify-center bg-background">
@@ -96,10 +124,12 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <Router hook={useHashLocation}>
-          <AppRouter />
-        </Router>
-        <Toaster />
+        <SessionKeyProvider>
+          <Router hook={useHashLocation}>
+            <AppRouter />
+          </Router>
+          <Toaster />
+        </SessionKeyProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

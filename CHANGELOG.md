@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.5.0] — 2026-03-29
+
+### Added
+- **Multi-key API management** — multiple OpenRouter API keys can now be stored, labelled, starred as primary, and deleted from Settings. The primary key is used automatically for all requests.
+- **Session-only key** — on the onboarding screen (and in Settings), users can activate an API key that lives in memory only. It is never written to disk or sent to the server's database. Cleared when the tab is closed.
+- **Onboarding mode picker** — two explicit options when first setting up: _Save to server_ (persisted, shared across devices) or _This session only_ (in-memory, tab-scoped).
+- **Key labels** — each saved key gets an optional human-readable label (e.g. "Personal", "Work", "Free tier").
+- **Legacy key migration** — if a key was saved via the old `POST /api/settings` endpoint, a one-click "Migrate" button moves it into the new key manager.
+- **New API endpoints**: `GET /api/keys`, `POST /api/keys`, `POST /api/keys/:id/primary`, `DELETE /api/keys/:id`, `POST /api/keys/migrate-legacy`.
+
+### Changed
+- `X-Api-Key` request header takes highest priority in key resolution — session key is injected automatically on every `apiRequest` call.
+- Key resolution order: session header → primary saved key → legacy `openrouter_api_key` setting.
+- `queryClient.ts` exports `setSessionKey` / `getSessionKey` helpers; all requests include session key header when active.
+- `App.tsx` wraps the app in `SessionKeyProvider`; the onboarding guard passes through when a session key is active.
+- Settings page redesigned: old single-key form replaced with full key manager + separate session key card.
+
+---
+
 ## [3.4.1] — 2026-03-29
 
 ### Changed
