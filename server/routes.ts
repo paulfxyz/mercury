@@ -238,6 +238,45 @@ export function registerRoutes(httpServer: Server, app: Express) {
     res.json(s);
   });
 
+  // Launch a full debate ON the existing session (no new session created)
+  app.post("/api/sessions/:id/debate", async (req, res) => {
+    const { selectedModels, iterations: iterCount = 15, temperature = 0.7, consensusThreshold = 0.7, workflowId, query: queryOverride } = req.body;
+    if (!selectedModels?.length) return res.status(400).json({ error: "selectedModels required" });
+
+    const session = storage.getSession(req.params.id);
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    const apiKey = resolveApiKey(req);
+    if (!apiKey) return res.status(401).json({ error: "API key not configured" });
+
+    // Use follow-up query if provided, otherwise use original session query
+    const debateQuery = queryOverride?.trim() || session.query;
+
+    // Reset the existing session for a full debate run
+    storage.updateSession(req.params.id, {
+      status: "running",
+      currentIteration: 0,
+      totalIterations: iterCount,
+      finalAnswer: null,
+      workflowId: workflowId ?? null,
+    });
+
+    res.json({ sessionId: req.params.id });
+
+    setImmediate(async () => {
+      try {
+        await runOrchestration(
+          req.params.id, debateQuery, selectedModels, iterCount, apiKey,
+          (update) => broadcast(req.params.id, update),
+          temperature, consensusThreshold
+        );
+      } catch (e) {
+        storage.updateSession(req.params.id, { status: "error" });
+        broadcast(req.params.id, { type: "error", message: String(e) });
+      }
+    });
+  });
+
   // Append a follow-up Q&A to an existing session (inline thread)
   app.post("/api/sessions/:id/followup", async (req, res) => {
     const { query } = req.body;

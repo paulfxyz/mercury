@@ -536,7 +536,13 @@ function Results({ session, iterations, isQuick }: { session: Session; iteration
 }
 
 // ─── Follow-up entry (answered inline) ───────────────────────
-function FollowUpEntryCard({ entry, idx }: { entry: FollowUpEntry; idx: number }) {
+function FollowUpEntryCard({ entry, idx, onLaunchDebate, onCustomSetup, isLast }: {
+  entry: FollowUpEntry;
+  idx: number;
+  onLaunchDebate: (cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string; queryOverride?: string }) => void;
+  onCustomSetup: (query: string) => void;
+  isLast: boolean;
+}) {
   return (
     <div className="space-y-3 animate-fade-in-up">
       {/* Thread connector */}
@@ -560,6 +566,14 @@ function FollowUpEntryCard({ entry, idx }: { entry: FollowUpEntry; idx: number }
           <div className="mercury-prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(entry.answer) }} />
         </div>
       </div>
+      {/* Debate starter for this follow-up — always shown so user can escalate */}
+      {isLast && (
+        <DebateStarter
+          query={entry.query}
+          onLaunchDebate={cfg => onLaunchDebate({ ...cfg, queryOverride: entry.query })}
+          onCustomSetup={() => onCustomSetup(entry.query)}
+        />
+      )}
     </div>
   );
 }
@@ -631,8 +645,9 @@ export default function SessionPage() {
   const [liveIters, setLiveIters] = useState<LiveIteration[]>([]);
   const [currentPhase, setCurrentPhase] = useState("research");
   const [showLive, setShowLive] = useState(true);
-  // Debate starter / wizard state (shown after quick answer)
+  // Debate starter / wizard state (shown after quick answer or follow-up)
   const [showWizard, setShowWizard] = useState(false);
+  const [wizardQuery, setWizardQuery] = useState<string | null>(null); // null = original session query
 
   // Pending follow-up (being generated)
   const [pendingFollowUp, setPendingFollowUp] = useState<string | null>(null);
@@ -654,19 +669,21 @@ export default function SessionPage() {
     refetchInterval: () => session?.status === "running" ? 3000 : false,
   });
 
-  // Launch a full debate from this session page
+  // Launch a full debate ON this same session — no navigation, no new session
+  // Accepts an optional queryOverride so follow-up questions can be debated
   const debateMutation = useMutation({
-    mutationFn: async (cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string }) => {
-      const res = await apiRequest("POST", "/api/inquire", {
-        query: session?.query ?? "",
-        title: session?.title ?? (session?.query ?? "").slice(0, 60),
-        ...cfg,
+    mutationFn: async (cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string; queryOverride?: string }) => {
+      const { queryOverride, ...rest } = cfg;
+      const res = await apiRequest("POST", `/api/sessions/${id}/debate`, {
+        ...rest,
+        ...(queryOverride ? { query: queryOverride } : {}),
       });
       return res.json() as Promise<{ sessionId: string }>;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
-      navigate(`/session/${data.sessionId}`);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", id] });
+      setShowWizard(false);
+      setShowLive(true);
     },
     onError: () => toast({ title: "Could not launch the debate.", variant: "destructive" }),
   });
@@ -952,18 +969,25 @@ export default function SessionPage() {
           {/* Results */}
           {isCompleted && <Results session={session} iterations={storedIters} isQuick={isQuick} />}
 
-          {/* ── Debate starter — shown after quick answer, before any debate launched ── */}
+          {/* ── Debate starter — shown after quick answer when no follow-ups have been added yet ── */}
           {isCompleted && isQuick && storedIters.length === 0 && followUps.length === 0 && !showWizard && (
             <DebateStarter
               query={session.query}
               onLaunchDebate={cfg => debateMutation.mutate(cfg)}
-              onCustomSetup={() => setShowWizard(true)}
+              onCustomSetup={() => { setWizardQuery(null); setShowWizard(true); }}
             />
           )}
 
           {/* ── Follow-up thread ── */}
           {followUps.map((fu, i) => (
-            <FollowUpEntryCard key={fu.createdAt} entry={fu} idx={i} />
+            <FollowUpEntryCard
+              key={fu.createdAt}
+              entry={fu}
+              idx={i}
+              isLast={i === followUps.length - 1 && !pendingFollowUp && isCompleted}
+              onLaunchDebate={cfg => debateMutation.mutate(cfg)}
+              onCustomSetup={q => { setWizardQuery(q); setShowWizard(true); }}
+            />
           ))}
 
           {/* Pending follow-up (generating) */}
@@ -1018,9 +1042,12 @@ export default function SessionPage() {
         )}>
           {showWizard && session && (
             <InquiryWizard
-              query={session.query}
+              query={wizardQuery ?? session.query}
               onClose={() => setShowWizard(false)}
-              onLaunch={cfg => { setShowWizard(false); debateMutation.mutate(cfg); }}
+              onLaunch={cfg => {
+                setShowWizard(false);
+                debateMutation.mutate(wizardQuery ? { ...cfg, queryOverride: wizardQuery } : cfg);
+              }}
             />
           )}
         </div>

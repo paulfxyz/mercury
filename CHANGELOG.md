@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.7.2] — 2026-03-30
+
+### Fixed
+- **Debate starter after follow-ups** — after any follow-up quick answer, a full debate starter (Quick / Saved workflow / Custom setup) now appears so the user can escalate any follow-up into a full debate.
+- Debate and follow-up questions can be launched in any order and any number of times within the same session thread.
+- `FollowUpEntryCard` now accepts and renders a `DebateStarter` when it is the last entry in the thread.
+- `wizardQuery` state tracks which question the wizard is debating (original or a follow-up), and passes it as `queryOverride` to `POST /api/sessions/:id/debate`.
+
+---
+
 ## [3.7.1] — 2026-03-30
 
 ### Fixed
