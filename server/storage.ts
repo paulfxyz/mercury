@@ -70,6 +70,8 @@ sqlite.exec(`
 for (const col of [
   "ALTER TABLE sessions ADD COLUMN workflow_id TEXT;",
   "ALTER TABLE sessions ADD COLUMN quick_answer TEXT;",
+  "ALTER TABLE sessions ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0;",
+  "ALTER TABLE sessions ADD COLUMN follow_ups TEXT NOT NULL DEFAULT '[]';",
   "ALTER TABLE workflows ADD COLUMN temperature REAL NOT NULL DEFAULT 0.7;",
   "ALTER TABLE workflows ADD COLUMN consensus_threshold REAL NOT NULL DEFAULT 0.7;",
 ]) {
@@ -84,6 +86,9 @@ export interface IStorage {
   updateSession(id: string, data: Partial<Session>): Session | undefined;
   deleteSession(id: string): void;
   deleteAllSessions(): void;
+  updateSessionTitle(id: string, title: string): Session | undefined;
+  setPinned(id: string, pinned: boolean): Session | undefined;
+  appendFollowUp(id: string, query: string, answer: string): Session | undefined;
 
   createIteration(data: InsertIteration): Iteration;
   getIterationsBySession(sessionId: string): Iteration[];
@@ -125,6 +130,23 @@ export const storage: IStorage = {
   deleteAllSessions() {
     db.delete(iterations).run();
     db.delete(sessions).run();
+  },
+  updateSessionTitle(id, title) {
+    db.update(sessions).set({ title } as any).where(eq(sessions.id, id)).run();
+    return db.select().from(sessions).where(eq(sessions.id, id)).get();
+  },
+  setPinned(id, pinned) {
+    db.update(sessions).set({ isPinned: pinned ? 1 : 0 } as any).where(eq(sessions.id, id)).run();
+    return db.select().from(sessions).where(eq(sessions.id, id)).get();
+  },
+  appendFollowUp(id, query, answer) {
+    const session = db.select().from(sessions).where(eq(sessions.id, id)).get();
+    if (!session) return undefined;
+    let followUps: Array<{ query: string; answer: string; createdAt: number }> = [];
+    try { followUps = JSON.parse((session as any).followUps ?? "[]"); } catch {}
+    followUps.push({ query, answer, createdAt: Date.now() });
+    db.update(sessions).set({ followUps: JSON.stringify(followUps) } as any).where(eq(sessions.id, id)).run();
+    return db.select().from(sessions).where(eq(sessions.id, id)).get();
   },
 
   createIteration(data) {

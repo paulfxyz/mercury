@@ -12,7 +12,7 @@ import {
   ArrowLeft, Trash2, Copy, CheckCheck, Download, ChevronDown, ChevronUp,
   Eye, EyeOff, Loader2, CheckCircle2, AlertTriangle,
   FlaskConical, MessageCircle, Vote, BarChart3, Award, Sparkles, Zap,
-  CornerDownRight, ArrowUp,
+  CornerDownRight, ArrowUp, Pin, PinOff, Pencil, Check, X,
 } from "lucide-react";
 import type { Session, Iteration } from "@shared/schema";
 
@@ -25,6 +25,7 @@ interface LiveIteration {
   summary: string;
   consensus: number;
 }
+interface FollowUpEntry { query: string; answer: string; createdAt: number; }
 
 const PHASE_CFG: Record<string, { icon: React.ElementType; label: string; color: string; bg: string }> = {
   research:  { icon: FlaskConical,  label: "Research",  color: "text-blue-600 dark:text-blue-400",    bg: "bg-blue-50 dark:bg-blue-900/20" },
@@ -98,36 +99,28 @@ function PhaseTimeline({ currentPhase }: { currentPhase: string }) {
 function LivePanel({ iters }: { iters: LiveIteration[] }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [iters.length]);
-
   return (
     <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
       {iters.map((iter) => {
         const cfg = PHASE_CFG[iter.phase] ?? PHASE_CFG.research;
         const Icon = cfg.icon;
         const pct = iter.consensus ? Math.round(iter.consensus * 100) : null;
-
         return (
           <div key={iter.iteration} className="animate-fade-in-up">
-            {/* Round header */}
             <div className="flex items-center gap-2 mb-2">
               <div className={cn("w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0", cfg.bg)}>
                 <Icon className={cn("w-2.5 h-2.5", cfg.color)} />
               </div>
               <span className="text-xs font-semibold text-foreground">Round {iter.iteration} — {cfg.label}</span>
-              {pct !== null && (
-                <Badge variant="outline" className="text-xs py-0 ml-auto">{pct}% consensus</Badge>
-              )}
+              {pct !== null && <Badge variant="outline" className="text-xs py-0 ml-auto">{pct}% consensus</Badge>}
             </div>
-            {/* Model responses */}
             {iter.responses.map((r, i) => (
               <div key={i} className={cn(
                 "ml-6 mb-1.5 px-3 py-2 rounded-lg text-xs border",
                 r.content.startsWith("[Error:") ? "border-destructive/30 bg-destructive/5" : "border-border bg-card"
               )}>
                 <p className="font-medium text-foreground mb-1">{r.modelName}</p>
-                <p className="text-muted-foreground leading-relaxed">
-                  {r.content.slice(0, 280)}{r.content.length > 280 ? "…" : ""}
-                </p>
+                <p className="text-muted-foreground leading-relaxed">{r.content.slice(0, 280)}{r.content.length > 280 ? "…" : ""}</p>
               </div>
             ))}
           </div>
@@ -138,19 +131,15 @@ function LivePanel({ iters }: { iters: LiveIteration[] }) {
   );
 }
 
-// ─── Iteration accordion (completed view) ─────────────────────
+// ─── Iteration accordion ──────────────────────────────────────
 function IterCard({ iter, idx }: { iter: LiveIteration; idx: number }) {
   const [open, setOpen] = useState(false);
   const cfg = PHASE_CFG[iter.phase] ?? PHASE_CFG.research;
   const Icon = cfg.icon;
   const pct = iter.consensus ? Math.round(iter.consensus * 100) : null;
-
   return (
     <div className="border border-border rounded-lg overflow-hidden animate-fade-in-up" style={{ animationDelay: `${idx * 30}ms` }}>
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent/40 transition-colors text-left"
-      >
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent/40 transition-colors text-left">
         <div className={cn("w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0", cfg.bg)}>
           <Icon className={cn("w-3.5 h-3.5", cfg.color)} />
         </div>
@@ -179,60 +168,12 @@ function IterCard({ iter, idx }: { iter: LiveIteration; idx: number }) {
 }
 
 // ─── Results section ──────────────────────────────────────────
-// ─── Follow-up bar ───────────────────────────────────────────────
-function FollowUpBar({ answer, onSubmit }: { answer: string; onSubmit: (q: string) => void }) {
-  const [followUp, setFollowUp] = useState("");
-  const ref = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    const ta = ref.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = Math.min(ta.scrollHeight, 180) + "px";
-  }, [followUp]);
-
-  return (
-    <div className="border border-border rounded-xl overflow-hidden bg-card animate-fade-in-up">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
-        <CornerDownRight className="w-3.5 h-3.5 text-muted-foreground" />
-        <span className="text-xs font-semibold text-foreground">Ask a follow-up</span>
-        <span className="text-xs text-muted-foreground ml-1">— continue this thread with a new inquiry.</span>
-      </div>
-      <textarea
-        ref={ref}
-        value={followUp}
-        onChange={e => setFollowUp(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (followUp.trim()) onSubmit(followUp.trim()); }
-        }}
-        placeholder="Dig deeper, challenge the answer, or explore a related angle…"
-        className="w-full border-0 outline-none resize-none text-sm leading-relaxed bg-transparent px-4 pt-3 pb-2 text-foreground placeholder:text-muted-foreground min-h-[72px]"
-        rows={2}
-        data-testid="input-session-followup"
-      />
-      <div className="flex items-center justify-between px-4 py-3">
-        <span className="hidden sm:inline text-xs text-muted-foreground">⌘+Enter to send</span>
-        <span className="sm:hidden text-xs text-muted-foreground">Tap to send</span>
-        <button
-          onClick={() => { if (followUp.trim()) onSubmit(followUp.trim()); }}
-          disabled={!followUp.trim()}
-          className="inline-flex items-center gap-1.5 text-xs font-medium px-3 h-8 rounded-lg bg-foreground text-background hover:opacity-90 transition-opacity disabled:opacity-40"
-        >
-          Inquire <ArrowUp className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function Results({ session, iterations, isQuick }: { session: Session; iterations: Iteration[]; isQuick?: boolean }) {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
   const finalAnswer = session.finalAnswer ?? session.quickAnswer ?? "";
-
   const lastIter = iterations[iterations.length - 1];
   const consensus = lastIter?.consensus ? Math.round(lastIter.consensus * 100) : null;
-
   const allModels: string[] = [];
   for (const it of iterations) {
     try {
@@ -261,27 +202,19 @@ function Results({ session, iterations, isQuick }: { session: Session; iteration
 
   return (
     <div className="space-y-4 animate-fade-in-up">
-      {/* Header */}
       <div className={cn(
         "border rounded-xl p-4",
-        isQuick
-          ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/40"
-          : "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/40"
+        isQuick ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/40"
+                : "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/40"
       )}>
         <div className="flex items-center gap-3">
-          <div className={cn(
-            "w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0",
-            isQuick ? "bg-amber-100 dark:bg-amber-900/40" : "bg-green-100 dark:bg-green-900/40"
-          )}>
-            {isQuick
-              ? <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              : <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
-            }
+          <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0",
+            isQuick ? "bg-amber-100 dark:bg-amber-900/40" : "bg-green-100 dark:bg-green-900/40")}>
+            {isQuick ? <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                     : <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground">
-              {isQuick ? "Quick answer" : "Inquiry complete"}
-            </p>
+            <p className="text-sm font-semibold text-foreground">{isQuick ? "Quick answer" : "Inquiry complete"}</p>
             <p className="text-xs text-muted-foreground">
               {isQuick ? "Single model · instant response" : `${iterations.length} rounds · ${allModels.length} expert${allModels.length !== 1 ? "s" : ""}`}
             </p>
@@ -301,29 +234,20 @@ function Results({ session, iterations, isQuick }: { session: Session; iteration
         )}
       </div>
 
-      {/* Answer */}
       <div className="border border-border rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-foreground/50" />
-            <span className="text-sm font-semibold text-foreground">
-              {isQuick ? "Answer" : "Consensus Answer"}
-            </span>
+            <span className="text-sm font-semibold text-foreground">{isQuick ? "Answer" : "Consensus Answer"}</span>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              data-testid="btn-copy-answer"
-              onClick={copy}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent border border-border transition-colors"
-            >
+            <button data-testid="btn-copy-answer" onClick={copy}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent border border-border transition-colors">
               {copied ? <CheckCheck className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
               {copied ? "Copied" : "Copy"}
             </button>
-            <button
-              data-testid="btn-download-answer"
-              onClick={download}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent border border-border transition-colors"
-            >
+            <button data-testid="btn-download-answer" onClick={download}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent border border-border transition-colors">
               <Download className="w-3.5 h-3.5" /> .md
             </button>
           </div>
@@ -331,10 +255,94 @@ function Results({ session, iterations, isQuick }: { session: Session; iteration
         <div className="p-5">
           {finalAnswer
             ? <div className="mercury-prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(finalAnswer) }} />
-            : <p className="text-sm text-muted-foreground italic">No answer generated.</p>
-          }
+            : <p className="text-sm text-muted-foreground italic">No answer generated.</p>}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Follow-up entry (answered inline) ───────────────────────
+function FollowUpEntryCard({ entry, idx }: { entry: FollowUpEntry; idx: number }) {
+  return (
+    <div className="space-y-3 animate-fade-in-up">
+      {/* Thread connector */}
+      <div className="flex items-center gap-2 pl-1">
+        <div className="w-px h-6 bg-border ml-3" />
+        <CornerDownRight className="w-3.5 h-3.5 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">Follow-up {idx + 1}</span>
+      </div>
+      {/* Question */}
+      <div className="bg-muted/40 border border-border rounded-lg px-4 py-3">
+        <p className="text-xs font-medium text-muted-foreground mb-1">You asked</p>
+        <p className="text-sm text-foreground">{entry.query}</p>
+      </div>
+      {/* Answer */}
+      <div className="border border-border rounded-xl overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/20">
+          <Zap className="w-3.5 h-3.5 text-amber-500" />
+          <span className="text-xs font-semibold text-foreground">Quick answer</span>
+        </div>
+        <div className="px-4 py-4">
+          <div className="mercury-prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(entry.answer) }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Follow-up input bar ──────────────────────────────────────
+function FollowUpBar({ onSubmit, isPending }: { onSubmit: (q: string) => void; isPending: boolean }) {
+  const [value, setValue] = useState("");
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const ta = ref.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 180) + "px";
+  }, [value]);
+
+  function submit() {
+    if (!value.trim() || isPending) return;
+    onSubmit(value.trim());
+    setValue("");
+    // Scroll to bottom after submit
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+  }
+
+  return (
+    <div>
+      <div className="border border-border rounded-xl overflow-hidden bg-card">
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/20">
+          <CornerDownRight className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-xs font-semibold text-foreground">Ask a follow-up</span>
+          <span className="text-xs text-muted-foreground ml-1">— answer appears below, in this thread.</span>
+        </div>
+        <textarea
+          ref={ref}
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submit(); } }}
+          placeholder="Dig deeper, challenge the answer, or explore a related angle…"
+          className="w-full border-0 outline-none resize-none text-sm leading-relaxed bg-transparent px-4 pt-3 pb-2 text-foreground placeholder:text-muted-foreground min-h-[64px]"
+          rows={2}
+          data-testid="input-session-followup"
+        />
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="hidden sm:inline text-xs text-muted-foreground">⌘+Enter to send</span>
+          <span className="sm:hidden text-xs text-muted-foreground">Tap to send</span>
+          <button
+            onClick={submit}
+            disabled={!value.trim() || isPending}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 h-8 rounded-lg bg-foreground text-background hover:opacity-90 transition-opacity disabled:opacity-40"
+          >
+            {isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Thinking…</> : <>Inquire <ArrowUp className="w-3.5 h-3.5" /></>}
+          </button>
+        </div>
+      </div>
+      <div ref={bottomRef} />
     </div>
   );
 }
@@ -345,10 +353,20 @@ export default function SessionPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const wsRef = useRef<WebSocket | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const [liveIters, setLiveIters] = useState<LiveIteration[]>([]);
   const [currentPhase, setCurrentPhase] = useState("research");
-  const [showLive, setShowLive] = useState(true); // live panel open by default
+  const [showLive, setShowLive] = useState(true);
+
+  // Pending follow-up (being generated)
+  const [pendingFollowUp, setPendingFollowUp] = useState<string | null>(null);
+
+  // Inline rename
+  const [renaming, setRenaming] = useState(false);
+  const [renameVal, setRenameVal] = useState("");
+  const renameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (renaming) renameRef.current?.focus(); }, [renaming]);
 
   const { data: session, isLoading } = useQuery<Session>({
     queryKey: ["/api/sessions", id],
@@ -366,7 +384,35 @@ export default function SessionPage() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/sessions"] }); navigate("/chat"); },
   });
 
-  // WebSocket for live updates
+  const renameMutation = useMutation({
+    mutationFn: (title: string) => apiRequest("PATCH", `/api/sessions/${id}/title`, { title }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      setRenaming(false);
+      toast({ title: "Inquiry renamed." });
+    },
+  });
+
+  const pinMutation = useMutation({
+    mutationFn: (pinned: boolean) => apiRequest("PATCH", `/api/sessions/${id}/pin`, { pinned }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      toast({ title: (session as any)?.isPinned ? "Unpinned." : "Pinned to top of sidebar." });
+    },
+  });
+
+  const followUpMutation = useMutation({
+    mutationFn: (query: string) => apiRequest("POST", `/api/sessions/${id}/followup`, { query }),
+    onMutate: (query) => { setPendingFollowUp(query); },
+    onError: () => {
+      setPendingFollowUp(null);
+      toast({ title: "Could not get a follow-up answer.", variant: "destructive" });
+    },
+  });
+
+  // WebSocket — also handles followup_complete events
   useEffect(() => {
     if (!id) return;
     const base = new URL("./ws", location.href);
@@ -382,12 +428,9 @@ export default function SessionPage() {
           setLiveIters(prev => {
             if (prev.find(i => i.iteration === d.iteration)) return prev;
             return [...prev, {
-              iteration: d.iteration,
-              phase: d.phase ?? "research",
+              iteration: d.iteration, phase: d.phase ?? "research",
               phaseLabel: d.phaseLabel ?? d.phase ?? "Research",
-              responses: d.responses ?? [],
-              summary: d.summary ?? "",
-              consensus: d.consensus ?? 0,
+              responses: d.responses ?? [], summary: d.summary ?? "", consensus: d.consensus ?? 0,
             }];
           });
           queryClient.invalidateQueries({ queryKey: ["/api/sessions", id] });
@@ -395,6 +438,16 @@ export default function SessionPage() {
         if (d.type === "completed" || d.type === "quick_complete") {
           queryClient.invalidateQueries({ queryKey: ["/api/sessions", id] });
           queryClient.invalidateQueries({ queryKey: ["/api/sessions", id, "iterations"] });
+        }
+        if (d.type === "followup_complete") {
+          setPendingFollowUp(null);
+          queryClient.invalidateQueries({ queryKey: ["/api/sessions", id] });
+          // Scroll to the new follow-up
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 200);
+        }
+        if (d.type === "followup_error") {
+          setPendingFollowUp(null);
+          toast({ title: "Follow-up failed.", description: d.message, variant: "destructive" });
         }
         if (d.type === "error") toast({ title: "Something went wrong during the inquiry.", description: d.message, variant: "destructive" });
       } catch {}
@@ -414,15 +467,16 @@ export default function SessionPage() {
   const isCompleted = session?.status === "completed";
   const isError = session?.status === "error";
   const isQuick = !!(session?.quickAnswer && storedIters.length === 0);
+  const isPinned = !!(session as any)?.isPinned;
   const progress = session && session.totalIterations > 0
     ? Math.round((session.currentIteration / session.totalIterations) * 100) : 0;
 
+  // Parse follow-ups from session
+  let followUps: FollowUpEntry[] = [];
+  try { followUps = JSON.parse((session as any)?.followUps ?? "[]"); } catch {}
+
   if (isLoading) return (
-    <Layout>
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
-    </Layout>
+    <Layout><div className="h-full flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div></Layout>
   );
 
   if (!session) return (
@@ -439,23 +493,53 @@ export default function SessionPage() {
     <Layout>
       <div className="h-full overflow-y-auto">
         <div className="max-w-2xl mx-auto px-4 py-6 pb-12 space-y-5">
-          {/* Header */}
+
+          {/* ── Header ── */}
           <div className="flex items-start gap-3">
-            <button
-              data-testid="btn-back"
-              onClick={() => navigate("/chat")}
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex-shrink-0 mt-0.5"
-            >
+            <button data-testid="btn-back" onClick={() => navigate("/chat")}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex-shrink-0 mt-0.5">
               <ArrowLeft className="w-4 h-4" />
             </button>
+
             <div className="flex-1 min-w-0">
-              <h1 className="text-base font-semibold text-foreground leading-snug">{session.title}</h1>
+              {renaming ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={renameRef}
+                    value={renameVal}
+                    onChange={e => setRenameVal(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && renameVal.trim()) renameMutation.mutate(renameVal.trim());
+                      if (e.key === "Escape") setRenaming(false);
+                    }}
+                    className="flex-1 text-sm font-semibold bg-transparent border-b border-foreground outline-none text-foreground pb-0.5"
+                  />
+                  <button onClick={() => renameVal.trim() && renameMutation.mutate(renameVal.trim())}
+                    className="p-1 text-green-600 hover:text-green-700 transition-colors">
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => setRenaming(false)} className="p-1 text-muted-foreground hover:text-foreground transition-colors">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 group">
+                  <h1 className="text-base font-semibold text-foreground leading-snug truncate">{session.title}</h1>
+                  <button
+                    onClick={() => { setRenameVal(session.title); setRenaming(true); }}
+                    className="p-1 rounded text-muted-foreground/0 group-hover:text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                    title="Rename"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className={cn(
                   "inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full font-medium",
-                  isRunning ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
+                  isRunning   ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
                   isCompleted ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
-                  isError ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400" :
+                  isError     ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400" :
                   "bg-muted text-muted-foreground"
                 )}>
                   {isRunning && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />}
@@ -464,13 +548,30 @@ export default function SessionPage() {
                   <span className="capitalize">{session.status}</span>
                 </span>
                 <span className="text-xs text-muted-foreground">{new Date(session.createdAt).toLocaleString()}</span>
+                {followUps.length > 0 && (
+                  <span className="text-xs text-muted-foreground">{followUps.length} follow-up{followUps.length !== 1 ? "s" : ""}</span>
+                )}
               </div>
             </div>
+
+            {/* Pin button */}
             <button
-              data-testid="btn-delete"
-              onClick={() => confirm("Delete this inquiry?") && deleteMutation.mutate()}
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0"
+              onClick={() => pinMutation.mutate(!isPinned)}
+              className={cn(
+                "p-1.5 rounded-lg transition-colors flex-shrink-0",
+                isPinned
+                  ? "text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              )}
+              title={isPinned ? "Unpin" : "Pin to sidebar"}
             >
+              {isPinned ? <Pin className="w-4 h-4 fill-current" /> : <PinOff className="w-4 h-4" />}
+            </button>
+
+            {/* Delete button */}
+            <button data-testid="btn-delete"
+              onClick={() => confirm("Delete this inquiry?") && deleteMutation.mutate()}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
@@ -486,22 +587,15 @@ export default function SessionPage() {
             <div className="border border-border rounded-xl p-4 space-y-4 bg-card">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-foreground">
-                    Round {session.currentIteration} of {session.totalIterations}
-                  </p>
+                  <p className="text-sm font-semibold text-foreground">Round {session.currentIteration} of {session.totalIterations}</p>
                   <p className="text-xs text-muted-foreground capitalize">{currentPhase} phase</p>
                 </div>
                 <span className="text-2xl font-bold text-foreground tabular-nums">{progress}%</span>
               </div>
               <Progress value={progress} className="h-1.5" />
               <PhaseTimeline currentPhase={currentPhase} />
-
-              {/* Live view toggle */}
-              <button
-                data-testid="btn-toggle-live"
-                onClick={() => setShowLive(!showLive)}
-                className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors pt-1 border-t border-border"
-              >
+              <button data-testid="btn-toggle-live" onClick={() => setShowLive(!showLive)}
+                className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors pt-1 border-t border-border">
                 {showLive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 {showLive ? "Hide" : "View"} live progress
                 {showLive ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -509,72 +603,48 @@ export default function SessionPage() {
             </div>
           )}
 
-          {/* ── Live panel (real-time responses stream) ── */}
+          {/* Live panel */}
           {isRunning && showLive && (
             <div className="border border-border rounded-xl overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                 <span className="text-xs font-semibold text-foreground">Live — Expert debate in progress</span>
-                {liveIters.length > 0 && (
-                  <Badge variant="outline" className="text-xs py-0 ml-auto">
-                    {liveIters.length} round{liveIters.length !== 1 ? "s" : ""} complete
-                  </Badge>
-                )}
+                {liveIters.length > 0 && <Badge variant="outline" className="text-xs py-0 ml-auto">{liveIters.length} round{liveIters.length !== 1 ? "s" : ""} complete</Badge>}
               </div>
-
-              {/* ── No rounds yet: launching state ── */}
-              {liveIters.length === 0 && (
+              {liveIters.length === 0 ? (
                 <div className="px-4 py-6 space-y-4">
-                  {/* Launching row */}
                   <div className="flex items-center gap-3">
                     <div className="w-7 h-7 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
                       <Loader2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 animate-spin" />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-foreground">Inquiry launched.</p>
-                      <p className="text-xs text-muted-foreground">
-                        Calling your expert team — first responses arriving shortly…
-                      </p>
+                      <p className="text-xs text-muted-foreground">Calling your expert team — first responses arriving shortly…</p>
                     </div>
                   </div>
-
-                  {/* Animated model placeholders */}
                   <div className="ml-10 space-y-2">
                     {[0, 1, 2].map(i => (
-                      <div
-                        key={i}
-                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 border border-border"
-                        style={{ opacity: 1 - i * 0.2, animationDelay: `${i * 0.15}s` }}
-                      >
+                      <div key={i} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 border border-border" style={{ opacity: 1 - i * 0.2 }}>
                         <div className="w-4 h-4 rounded-full skeleton flex-shrink-0" />
                         <div className="flex-1 h-2.5 skeleton rounded-full" style={{ width: `${75 - i * 12}%` }} />
                       </div>
                     ))}
-                    <p className="text-xs text-muted-foreground pt-1 pl-1">
-                      Phase 1 of 5 — Research
-                    </p>
+                    <p className="text-xs text-muted-foreground pt-1 pl-1">Phase 1 of 5 — Research</p>
                   </div>
                 </div>
-              )}
-
-              {/* ── Rounds arriving ── */}
-              {liveIters.length > 0 && (
-                <div className="p-4">
-                  <LivePanel iters={liveIters} />
-                </div>
+              ) : (
+                <div className="p-4"><LivePanel iters={liveIters} /></div>
               )}
             </div>
           )}
 
-          {/* Running spinner — only shown when live panel is hidden */}
           {isRunning && !showLive && (
             <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Expert panel is debating your inquiry…
+              <Loader2 className="w-4 h-4 animate-spin" /> Expert panel is debating your inquiry…
             </div>
           )}
 
-          {/* ── Completed: iteration history ── */}
+          {/* Debate history */}
           {isCompleted && !isQuick && allIters.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -585,13 +655,42 @@ export default function SessionPage() {
             </div>
           )}
 
-          {/* ── Results ── */}
+          {/* Results */}
           {isCompleted && <Results session={session} iterations={storedIters} isQuick={isQuick} />}
 
-          {/* ── Follow-up bar ── */}
-          {isCompleted && <FollowUpBar answer={session.finalAnswer ?? session.quickAnswer ?? ""} onSubmit={(q) => navigate(`/chat?q=${encodeURIComponent(q)}`)} />}
+          {/* ── Follow-up thread ── */}
+          {followUps.map((fu, i) => (
+            <FollowUpEntryCard key={fu.createdAt} entry={fu} idx={i} />
+          ))}
 
-          {/* ── Error ── */}
+          {/* Pending follow-up (generating) */}
+          {pendingFollowUp && (
+            <div className="space-y-3 animate-fade-in-up">
+              <div className="flex items-center gap-2 pl-1">
+                <div className="w-px h-6 bg-border ml-3" />
+                <CornerDownRight className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Follow-up {followUps.length + 1}</span>
+              </div>
+              <div className="bg-muted/40 border border-border rounded-lg px-4 py-3">
+                <p className="text-xs font-medium text-muted-foreground mb-1">You asked</p>
+                <p className="text-sm text-foreground">{pendingFollowUp}</p>
+              </div>
+              <div className="border border-border rounded-xl p-4 flex items-center gap-3">
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground flex-shrink-0" />
+                <p className="text-sm text-muted-foreground">Getting answer…</p>
+              </div>
+            </div>
+          )}
+
+          {/* Follow-up input — shown on completed sessions */}
+          {isCompleted && !pendingFollowUp && (
+            <FollowUpBar
+              onSubmit={(q) => followUpMutation.mutate(q)}
+              isPending={followUpMutation.isPending}
+            />
+          )}
+
+          {/* Error */}
           {isError && (
             <div className="border border-destructive/30 bg-destructive/5 rounded-xl p-4">
               <div className="flex items-center gap-3">
@@ -601,11 +700,11 @@ export default function SessionPage() {
                   <p className="text-xs text-muted-foreground mt-0.5">Check your API key in Settings and try again.</p>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate("/chat")}>
-                New inquiry
-              </Button>
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate("/chat")}>New inquiry</Button>
             </div>
           )}
+
+          <div ref={bottomRef} />
         </div>
       </div>
     </Layout>

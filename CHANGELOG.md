@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.7.0] — 2026-03-30
+
+### Added
+- **Inline follow-up thread** — follow-up questions now append directly to the current session instead of creating a new one. The answer appears below the original results, indented with a thread connector. Multiple follow-ups stack in sequence, building a conversation thread inside the session.
+- **Rename inquiry** — click the pencil icon next to the title to rename any session inline. Press Enter to save, Escape to cancel.
+- **Pin inquiry** — pin any session to the top of the sidebar. Pinned sessions appear in a "Pinned" group above "Recent" with a filled amber pin icon. Click the pin again to unpin.
+- `PATCH /api/sessions/:id/title` — rename endpoint.
+- `PATCH /api/sessions/:id/pin` — pin/unpin endpoint.
+- `POST /api/sessions/:id/followup` — appends a quick answer to an existing session via WebSocket, no new session created.
+
+### Changed
+- Follow-up bar on session page now calls the inline endpoint instead of navigating to `/chat?q=`.
+- `sessions` table: new `is_pinned` (integer) and `follow_ups` (JSON text) columns, added via safe `ALTER TABLE` migration.
+- Sidebar: pinned sessions render at the top with a pin icon; unpinned recents follow below.
+- Session header: pencil rename button (visible on hover) and pin/unpin button always visible.
+
+---
+
 ## [3.6.0] — 2026-03-29
 
 ### Added

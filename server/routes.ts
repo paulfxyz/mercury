@@ -221,6 +221,70 @@ export function registerRoutes(httpServer: Server, app: Express) {
   app.delete("/api/sessions/:id", (req, res) => { storage.deleteSession(req.params.id); res.json({ success: true }); });
   app.get("/api/sessions/:id/iterations", (req, res) => res.json(storage.getIterationsBySession(req.params.id)));
 
+  // Rename session title
+  app.patch("/api/sessions/:id/title", (req, res) => {
+    const { title } = req.body;
+    if (!title?.trim()) return res.status(400).json({ error: "title required" });
+    const s = storage.updateSessionTitle(req.params.id, title.trim());
+    if (!s) return res.status(404).json({ error: "Not found" });
+    res.json(s);
+  });
+
+  // Pin / unpin session
+  app.patch("/api/sessions/:id/pin", (req, res) => {
+    const { pinned } = req.body;
+    const s = storage.setPinned(req.params.id, !!pinned);
+    if (!s) return res.status(404).json({ error: "Not found" });
+    res.json(s);
+  });
+
+  // Append a follow-up Q&A to an existing session (inline thread)
+  app.post("/api/sessions/:id/followup", async (req, res) => {
+    const { query } = req.body;
+    if (!query?.trim()) return res.status(400).json({ error: "query required" });
+    const apiKey = resolveApiKey(req);
+    if (!apiKey) return res.status(401).json({ error: "API key not configured" });
+
+    // Get quick answer for the follow-up
+    res.json({ status: "pending" });
+
+    setImmediate(async () => {
+      try {
+        const { runQuickAnswer: _rqa } = await import("./orchestrator");
+        // Use a temporary session to get the answer
+        const tmpSession = storage.createSession({
+          title: query.slice(0, 60),
+          query: query.trim(),
+          files: "[]",
+          selectedModels: JSON.stringify(["openai/gpt-4o-mini"]),
+          status: "running",
+          currentIteration: 0,
+          totalIterations: 1,
+          finalAnswer: null,
+          quickAnswer: null,
+          workflowId: null,
+        });
+
+        await _rqa(tmpSession.id, query.trim(), apiKey, () => {});
+
+        // Read the answer from the temp session
+        const done = storage.getSession(tmpSession.id);
+        const answer = done?.quickAnswer ?? done?.finalAnswer ?? "";
+
+        // Append to the original session
+        storage.appendFollowUp(req.params.id, query.trim(), answer);
+
+        // Clean up temp session
+        storage.deleteSession(tmpSession.id);
+
+        // Broadcast to original session clients
+        broadcast(req.params.id, { type: "followup_complete", query: query.trim(), answer });
+      } catch (e) {
+        broadcast(req.params.id, { type: "followup_error", message: String(e) });
+      }
+    });
+  });
+
   app.post("/api/upload", upload.array("files", 5), (req, res) => {
     const files = (req.files as Express.Multer.File[]) ?? [];
     res.json({ files: files.map(f => ({ name: f.originalname, size: f.size })) });

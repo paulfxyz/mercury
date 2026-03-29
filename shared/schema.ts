@@ -15,6 +15,8 @@ export const sessions = sqliteTable("sessions", {
   finalAnswer: text("final_answer"),
   quickAnswer: text("quick_answer"),  // for simple-query fast path
   workflowId: text("workflow_id"),
+  isPinned: integer("is_pinned").notNull().default(0),
+  followUps: text("follow_ups").notNull().default("[]"), // JSON: [{query, answer, createdAt}]
   createdAt: integer("created_at").notNull(),
 });
 export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true, createdAt: true });
