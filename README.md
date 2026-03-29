@@ -28,7 +28,7 @@
   ║   One model gives you an answer.                         ║
   ║   Many models give you the truth.                        ║
   ║                                                          ║
-  ║   Submit → Initial answer → Debate → Consensus           ║
+  ║   Submit → Answer → Debate → Consensus → Follow up       ║
   ║                                                          ║
   ║   v3.6.0  ·  mercury.sh  ·  github.com/paulfxyz          ║
   ╚══════════════════════════════════════════════════════════╝
@@ -61,11 +61,11 @@
 
 ## 👨‍💻 Why this exists
 
-I'm **Paul Fleury** — French internet entrepreneur based in Lisbon. I run [Openline](https://openline.com)) and build across a wide surface: infrastructure, automation, AI tooling, SaaS.
+I'm **Paul Fleury** — French internet entrepreneur based in Lisbon. I run [Openline](https://openline.com) and build across a wide surface: infrastructure, automation, AI tooling, SaaS.
 
 I kept hitting the same wall with AI assistants. Not that they were wrong — but that I had no reliable way to *know* when they were wrong.
 
-Ask GPT-4o a nuanced strategic question. Get a confident, well-written answer. Ask Claude. Get a different confident, well-written answer. Ask Llama. Another one. Not one of them volunteers that the others disagreed with them. The model has no incentive to surface its own uncertainty. It fills every gap with confidence.
+Ask GPT-4o a nuanced strategic question. Get a confident, well-written answer. Ask Claude. Get a different confident, well-written answer. Ask Llama. Another one. Not one of them volunteers that the others disagreed. The model has no incentive to surface its own uncertainty. It fills every gap with confidence.
 
 **The single-model trap**: one perspective, dressed up as an answer.
 
@@ -75,76 +75,58 @@ Mercury applies this to AI. Your inquiry goes through a configurable panel of mo
 
 The result is not just an answer. It's a **debugged answer**.
 
-> 💡 Designed and built entirely in collaboration with **[Perplexity Computer](https://www.perplexity.com)** — architecture through implementation, production bugs, deployment, and documentation. Human intent + AI execution, end to end.
+> 💡 Designed and built entirely in collaboration with **[Perplexity Computer](https://www.perplexity.ai/computer)** — architecture through implementation, production bugs, deployment, and documentation. Human intent + AI execution, end to end.
 
 ---
 
 ## 🔬 The exact flow
 
-This is what actually happens when you submit an inquiry in Mercury v3:
+This is what actually happens when you submit an inquiry in Mercury v3.6:
 
 ### Step 1 — Immediate initial answer
 
-The moment you hit submit, Mercury calls `gpt-4o-mini` and returns an answer in ~1–2 seconds. This isn't a placeholder — it's a real, complete response. The UI shows:
+The moment you hit submit, Mercury calls `gpt-4o-mini` and returns an answer in ~1–2 seconds. This is a real, complete response — not a placeholder. The UI shows:
 
 ```
 ⚡ Initial answer — Want to make sure? Run the expert debate below.
 
-[The answer text here, fully rendered]
+[The answer text, fully rendered]
 
-  Accept this answer ↓
+  👍 Accept this answer
 ```
 
-The answer is real and usable — not a placeholder. Below it, the **debate starter** appears automatically.
+If the quick answer is sufficient, you accept it and the conversation is done. Below the answer, the **debate starter** appears automatically.
 
 ### Step 2 — Choose how to run the debate
 
-Instead of jumping straight into a configuration wizard, Mercury presents three clear options:
+Three options, no forced wizard:
 
 | Option | What it does |
 |---|---|
-| ⚡ **Quick debate** | Launches instantly with GPT-4o + Claude 3.5 Sonnet + Gemini 2.0 Flash · 3 rounds · temperature 0.3. One click, no setup. |
-| ★ **Saved workflow** | Any workflow you've created appears here as a one-click option. Reuse a previous configuration without re-entering anything. |
-| ⚙ **Custom setup** | Opens a 4-step side panel — choose team size, pick models, set rounds, tune temperature and consensus. Save it as a workflow when you're done. |
-
-The common path — Quick debate — requires zero configuration and launches the debate in one click. The full wizard is always accessible but never mandatory.
-
-### Step 2b — Custom setup wizard (optional)
-
-If you choose "Custom setup", a panel slides in from the right:
-
-| Step | What happens |
-|---|---|
-| **Size** | Choose 2–12 models for the expert panel |
-| **Models** | Search OpenRouter's 100+ catalog. Each model gets an optional custom system prompt — assign roles like "You are a devil's advocate" or "Focus only on economic evidence" |
-| **Rounds** | 5–30 debate rounds. 15 is the default sweet spot |
-| **Config** | Temperature (0 = precise, 1 = creative), required consensus % (50–100%), optional: save this configuration as a named **workflow** for future reuse |
+| ⚡ **Quick debate** | GPT-4o + Claude 3.5 Sonnet + Gemini 2.0 Flash · 3 rounds · temp 0.3. One click, zero config. |
+| ★ **Saved workflow** | Any workflow you've saved appears as a one-click card. Reuse a previous configuration instantly. |
+| ⚙ **Custom setup** | Slides open a 4-step panel — team size, model selection with custom roles, rounds, temperature + consensus config. Optional: save as a new workflow. |
 
 ### Step 3 — The debate
 
-Models run in parallel across 5 phases. Each phase has a purpose-built system prompt:
+Models run in parallel across 5 phases:
 
 ```
-┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
-│ Research │ → │  Debate  │ → │   Vote   │ → │Synthesis │ → │  Final   │
-│          │   │          │   │          │   │          │   │          │
-│ Analyse  │   │ Challenge│   │ AGREE /  │   │ Extract  │   │Definitive│
-│ the      │   │ each     │   │ PARTIAL /│   │ strongest│   │ consensus│
-│ inquiry  │   │ other    │   │ DISAGREE │   │ points   │   │ answer   │
-└──────────┘   └──────────┘   └──────────┘   └──────────┘   └──────────┘
+Research → Debate → Vote → Synthesis → Final
 ```
 
-The live progress panel is open by default. You watch each model's response stream in round by round — who agreed, who pushed back, what they said.
+Each phase has a purpose-built system prompt. The live panel is open by default — every model's response streams in round by round. Consensus is tracked after each round. When the required threshold is reached early, the debate exits and proceeds to synthesis immediately.
 
-If the required consensus threshold is hit before all rounds complete, the debate exits early and proceeds to synthesis.
+### Step 4 — Results
 
-### Step 4 — Consensus answer
+- **Consensus % score** — agreement across all voting rounds
+- **Model breakdown** — who agreed, who pushed back, who was partial
+- **Full debate history** — every round, every model, expandable
+- **Copy / Download as Markdown**
 
-The final answer carries:
-- A **consensus % score** based on model agreement across voting rounds
-- **Model badges** listing every expert that participated
-- The full **debate history** — every round, every model's response, expandable
-- **Copy** and **Download as Markdown** buttons
+### Step 5 — Follow up
+
+After any completed inquiry — quick answer or full debate — a follow-up bar appears. Type a new question, hit send, and it fires as a new inquiry with the previous context visible. The thread continues naturally, no navigation required.
 
 ---
 
@@ -152,17 +134,21 @@ The final answer carries:
 
 | Feature | Detail |
 |---|---|
-| ⚡ Immediate initial answer | Every inquiry gets a fast single-model response before any debate — never a blank screen |
-| 🚀 One-click Quick debate | Launch with the top 3 models (GPT-4o, Claude 3.5, Gemini 2.0) · 3 rounds · temp 0.3 — no setup required |
-| 🧙 Expert team wizard | 4-step side panel: team size → model selection → rounds → temperature + consensus config |
-| 🎭 Custom model roles | Each model in the team gets an optional system prompt — assign devil's advocate, domain specialist, fact-checker |
-| 💾 Saved workflows | Name and save team configurations; one click to reuse in future inquiries |
-| 📡 Real-time live panel | WebSocket streams every model response as it arrives, grouped by round and phase |
-| 📊 Phase timeline | Pulses at the active phase: Research → Debate → Vote → Synthesis → Final |
-| 🎯 Consensus score | Final answer carries % agreement based on voting across all rounds |
-| 🚪 Early exit | Debate ends early when consensus threshold is reached — no wasted rounds |
+| ⚡ Immediate initial answer | Every inquiry gets a fast single-model response in ~1–2s — never a blank screen |
+| 🚀 One-click Quick debate | GPT-4o + Claude 3.5 + Gemini 2.0 · 3 rounds · temp 0.3 — no config required |
+| 🧙 Custom setup wizard | 4-step side panel: team size → models + roles → rounds → temperature + consensus |
+| 🎭 Custom model roles | Each model gets an optional system prompt — devil's advocate, domain expert, fact-checker |
+| 💾 Saved workflows | Named team configurations; one click to reuse across inquiries |
+| 🔁 Follow-up inquiry | After any answer, continue the thread immediately with a new question |
+| 📡 Real-time live panel | WebSocket streams every model response grouped by round and phase |
+| 📊 Phase timeline | Animated progress: Research → Debate → Vote → Synthesis → Final |
+| 🎯 Consensus score | Final answer carries % agreement from voting across all rounds |
+| 🚪 Early exit | Debate ends when consensus threshold is reached — no wasted rounds |
+| 🔑 Multi-key management | Add multiple OpenRouter keys with labels, star a primary, switch anytime |
+| 🕐 Session-only key | Use a key that never touches disk — memory only, cleared on tab close |
 | 🌡️ Temperature control | Per-workflow: 0 = precise, 1 = creative |
 | 📐 Consensus threshold | Required agreement % before Mercury considers the debate settled |
+| 📱 Mobile responsive | Collapsible sidebar drawer, full mobile layout across all pages |
 | 🔒 Self-hosted | Your API key, your server, your data. Nothing leaves your infrastructure |
 | ☀️🌙 Light + dark mode | Persistent, server-stored theme preference |
 | 📄 Export | Copy or download final consensus answer as Markdown |
@@ -187,6 +173,8 @@ npm run build
 npm start
 ```
 
+See [INSTALL.md](INSTALL.md) for full local, Docker, and Fly.io deployment guides.
+
 ---
 
 ## 🛫 Deploy to Fly.io
@@ -203,7 +191,7 @@ flyctl volumes create mercury_data --size 1 --region cdg
 flyctl deploy
 ```
 
-Live at `https://your-app-name.fly.dev`. The live Mercury demo is deployed exactly this way — `mercury-sh` app, Paris (`cdg`) region, with `demo.mercury.sh` pointing at it via A/AAAA records on SiteGround DNS.
+Live at `https://your-app-name.fly.dev`. The live Mercury demo runs exactly this way — `mercury-sh` app, Paris (`cdg`) region, with `demo.mercury.sh` pointing at it via DNS on SiteGround.
 
 ### Scale to zero
 
@@ -246,48 +234,77 @@ broadcast(sessionId, { type: "completed", finalAnswer });
 
 ### The initial answer path
 
-Before any debate, Mercury runs the inquiry through a single cheap model:
+Every inquiry starts here, before the debate is even considered:
 
 ```typescript
 // POST /api/quick-answer
-const answer = await callModel(apiKey, "openai/gpt-4o-mini", [{ role: "user", content: query }],
-  "You are a helpful, concise assistant. Answer the question directly and clearly.", 0.3);
+const answer = await callModel(apiKey, "openai/gpt-4o-mini",
+  [{ role: "user", content: query }],
+  "You are a helpful, concise assistant. Answer directly and clearly.",
+  0.3
+);
 
-storage.updateSession(sessionId, { status: "completed", quickAnswer: answer, finalAnswer: answer });
+storage.updateSession(sessionId, { status: "completed", quickAnswer: answer });
 broadcast(sessionId, { type: "quick_complete", answer });
 ```
 
-The frontend polls for `session.quickAnswer` every 1.2 seconds and renders it the moment it arrives. No complexity classifier, no branching — every inquiry always goes through this path first. Simple, predictable, fast.
+The frontend polls `session.quickAnswer` every 1.2 seconds. No complexity classifier, no branching logic — every inquiry always goes through this path first.
+
+### Key resolution (v3.5+)
+
+API keys are resolved in priority order per request:
+
+```typescript
+function resolveApiKey(req: Request): string | undefined {
+  // 1. X-Api-Key header — session-only key, never stored
+  const header = req.headers["x-api-key"];
+  if (header) return header.trim();
+
+  // 2. Primary saved key from the api_keys table
+  const primary = storage.getPrimaryApiKey();
+  if (primary) return primary.value;
+
+  // 3. Legacy openrouter_api_key setting (backwards compat)
+  return storage.getSetting("openrouter_api_key")?.value;
+}
+```
+
+The session key is set in React state and injected by `queryClient.ts` as an `X-Api-Key` header on every request. It never touches the database or localStorage.
+
+### Follow-up inquiry chain (v3.6+)
+
+```
+Session completes
+  → FollowUpBar renders at bottom
+  → User types follow-up
+  → navigate("/chat?q=<encoded>")
+  → chat.tsx reads ?q= on mount
+  → auto-fires quickMutation after 80ms
+  → new inquiry starts, accepted context visible above
+```
+
+The `?q=` URL param approach means follow-ups are also deep-linkable — send someone a pre-filled inquiry URL and it fires automatically on load.
 
 ### Real-time WebSocket
 
 ```typescript
-// Every iteration broadcasts to all connected clients for that session
-broadcast(sessionId, {
-  type: "iteration_complete",
-  iteration: i + 1,
-  phase: phase.type,       // "research" | "debate" | "vote" | "synthesis" | "final"
-  phaseLabel: phase.label, // human-readable
-  responses: modelResults, // full text from each model, including errors
-  consensus: score,
-  summary: `${n}/${total} experts responded.`
-});
+// Relative URL — works correctly under any proxy subpath
+const base = new URL("./ws", location.href);
+base.protocol = base.protocol === "https:" ? "wss:" : "ws:";
+const wsUrl = `${base.href}?sessionId=${id}`;
 ```
 
-The frontend connects via `new URL("./ws", location.href)` — relative URL construction that works correctly both locally and behind any proxy subpath.
-
-### SQLite as the truth
-
-The schema is intentionally minimal:
+### SQLite schema
 
 ```
+api_keys    — id, label, value, is_primary, created_at
 sessions    — one row per inquiry: status, query, final answer, workflow reference
-iterations  — one row per debate round: all model responses stored as JSON
-workflows   — saved expert team configurations: steps, iterations, temperature, consensus threshold
-settings    — key-value: API key (server-side only), theme
+iterations  — one row per debate round: all model responses as JSON
+workflows   — saved team configs: steps, iterations, temperature, consensus threshold
+settings    — key-value: legacy API key, theme
 ```
 
-`better-sqlite3` is synchronous — no async/await on database calls, no connection pools, no ORM ceremony. Drizzle provides type-safe queries. The database is a single file. Backup is `cp mercury.db mercury.db.bak`.
+`better-sqlite3` is fully synchronous — no async/await on database calls. Drizzle provides type-safe queries. The database is a single file at `mercury.db` locally or `/app/data/mercury.db` on Fly.io (persistent volume).
 
 ---
 
@@ -301,20 +318,20 @@ The first Fly.io deploy failed immediately:
 Error relocating better_sqlite3.node: fcntl64: symbol not found
 ```
 
-`better-sqlite3` is a native C++ addon. The sandbox where we built it runs Ubuntu (glibc). Fly.io's containers run Alpine Linux (musl libc). `fcntl64` is a glibc symbol that musl doesn't export. The pre-built binary was simply incompatible.
+`better-sqlite3` compiles a native C++ addon. The build environment runs Ubuntu (glibc). Fly.io's container runs Alpine Linux (musl libc). `fcntl64` is a glibc symbol — musl doesn't export it. The pre-built binary was simply incompatible with the runtime.
 
-The fix is to compile the native addon *inside* the Alpine container:
+The fix: compile the native addon *inside* the Alpine container, and do it *twice*:
 
 ```dockerfile
-RUN apk add --no-cache python3 make g++  # build tools for native modules
-RUN npm install                           # installs better-sqlite3 source
-RUN npm run build                         # compile the app
-RUN npm rebuild better-sqlite3            # compile native addon for musl/Alpine
-RUN npm prune --omit=dev                  # remove dev dependencies
-RUN npm rebuild better-sqlite3            # rebuild AGAIN — prune removes compiled binaries
+RUN apk add --no-cache python3 make g++  # build tools
+RUN npm install
+RUN npm run build
+RUN npm rebuild better-sqlite3            # compile for musl
+RUN npm prune --omit=dev                  # removes compiled binaries (!)
+RUN npm rebuild better-sqlite3            # compile again — prune wiped them
 ```
 
-The double `npm rebuild` is intentional. `npm prune` removes compiled native binaries even when the package is a production dependency, because the binaries live in `.cache`. Without the second rebuild, the app starts, finds no binary, crashes.
+The double rebuild is not a typo. `npm prune` removes native `.node` binaries even from production dependencies because they live in a cache directory that prune treats as purgeable. Without the second rebuild, the app deploys, starts, can't find the binary, and crashes silently.
 
 ### 2. An em dash breaks every API call
 
@@ -331,114 +348,172 @@ Character 8212 is `—` (U+2014, em dash). It was in the `X-Title` HTTP header:
 "X-Title": "Mercury — Deep Research Engine",  // ← kills every request
 ```
 
-HTTP headers are Latin-1 (0–255). The em dash is 8212. Node's `fetch` enforces this at the byte level. The error message tells you exactly what happened — but only if you know that 8212 = em dash.
+HTTP headers are Latin-1 (bytes 0–255). The em dash is codepoint 8212. Node's `fetch` enforces this at the byte level. The error tells you exactly what happened — but only if you know that 8212 = em dash.
 
 ```typescript
-"X-Title": "Mercury - Deep Research Engine",  // ✓
+"X-Title": "Mercury - Deep Research Engine",  // ✓ hyphen, not em dash
 ```
 
-One character. Took an hour to find. The lesson: never put typographic punctuation in HTTP headers. They're invisible in source code but lethal at runtime.
+One character. Invisible in source. Lethal at runtime. The lesson: never put typographic punctuation in HTTP headers.
 
-### 3. React Query `staleTime` blocks the onboarding guard
+### 3. React Query `staleTime: Infinity` traps the onboarding guard
 
-The onboarding guard checks `/api/onboarding` and redirects to the API key screen if no key is configured. The global QueryClient default was `staleTime: Infinity`.
+After saving the API key, the mutation invalidates `/api/onboarding`. But if navigation happens before the invalidation promise resolves, the component remounts with stale `{ hasApiKey: false }` in cache — and the guard redirects back to onboarding, clearing the just-saved state.
 
-After saving the API key, the mutation invalidates the query. But if navigation happens before the invalidation promise resolves, the component remounts with the stale `{ hasApiKey: false }` in cache — and the guard redirects back to onboarding.
+Fix: override `staleTime` specifically on the onboarding query:
 
-Fix: set `staleTime: 0, refetchOnMount: true` specifically on the onboarding query, overriding the global default.
+```typescript
+useQuery({
+  queryKey: ["/api/onboarding"],
+  staleTime: 0,           // always refetch on mount
+  refetchOnMount: true,   // even if recently fetched
+})
+```
+
+The global default of `staleTime: Infinity` is correct for most data. The onboarding check is the one exception — it must always reflect the server's current state.
 
 ### 4. WebSocket URL breaks under proxy subpaths
 
-Original:
 ```typescript
+// Wrong — constructs from origin root, breaks behind any subpath proxy
 const wsUrl = `${protocol}//${window.location.host}/ws?sessionId=${id}`;
-```
 
-This constructs an absolute URL from the origin root. When the app is deployed behind a proxy that serves it at a subpath (Perplexity Computer's preview proxy serves at `/port/5000/`), the WebSocket connects to the wrong path.
-
-```typescript
-// Correct: relative URL resolves the current path automatically
+// Correct — resolves relative to current page URL
 const base = new URL("./ws", location.href);
 base.protocol = base.protocol === "https:" ? "wss:" : "ws:";
 const wsUrl = `${base.href}?sessionId=${id}`;
 ```
 
-`new URL("./ws", location.href)` resolves correctly regardless of where in the URL hierarchy the app lives.
+`new URL("./ws", location.href)` handles any subpath automatically — `/`, `/app/`, `/port/5000/` — without needing to know the deployment environment.
 
-### 5. Radix Dialog kills model selection — ditch the Dialog entirely
+### 5. Radix Dialog captures pointer events, model selection impossible
 
-The model search dropdown needed to float above the dialog. We used `createPortal()` to render it on `document.body` at `position: fixed`, and tried `onPointerDown` with `stopPropagation` to outrun Radix's overlay.
+The model search dropdown inside the inquiry wizard needed to float above the dialog. We used `createPortal()` to render it at `position: fixed` on `document.body`, and tried `onPointerDown` with `stopPropagation`.
 
-It didn't work. Radix Dialog's overlay fires `onPointerDownOutside` regardless — it captures pointer events at the document level before any child handler can prevent them. Every model selection attempt closed the dialog instead.
+It didn't work. Radix Dialog's overlay fires `onPointerDownOutside` at the document level — before any child handler runs. Every model selection closed the dialog.
 
-The fix was to stop fighting the abstraction and remove the `<Dialog>` entirely:
+The fix: stop fighting the abstraction. Remove `<Dialog>` entirely.
 
 ```typescript
-// Before: Radix Dialog with portalled dropdown — model selection broken
+// Before — Radix Dialog, model selection broken
 <Dialog open={open} onOpenChange={setOpen}>
-  <DialogContent> <StepBuilder /> </DialogContent>
+  <DialogContent><StepBuilder /></DialogContent>
 </Dialog>
 
-// After: sibling split-panel — chat left, wizard slides in from right, zero overlay
+// After — sibling split-panel, no overlay, works perfectly
 <div className="flex h-full overflow-hidden">
-  <div className="flex-1"> {/* chat */} </div>
-  <div className={cn("w-[480px] border-l", !open && "w-0")}> {/* wizard */} </div>
+  <div className="flex-1">{/* chat */}</div>
+  <div className={cn("border-l transition-all", open ? "w-[480px]" : "w-0")}>
+    {/* wizard slides in from right */}
+  </div>
 </div>
 ```
 
-No overlay, no pointer capture, no z-index battles. `onMouseDown` on dropdown items works perfectly because there is nothing above them to intercept.
+No overlay, no z-index conflicts, no pointer capture. `onMouseDown` on dropdown items works because there is nothing above them.
+
+### 6. Session key can't use localStorage — sandbox blocks it
+
+The session-only API key (never persisted) needs to survive React re-renders and be available to all HTTP requests. The obvious answer — `localStorage` — is blocked in the sandboxed preview iframe used during development.
+
+Solution: keep the key in React state via a context provider (`SessionKeyProvider` in `App.tsx`) and export a module-level setter so `queryClient.ts` can inject it as a request header without needing to be inside a React tree.
+
+```typescript
+// queryClient.ts — module-level, accessible anywhere
+let _sessionKey: string | null = null;
+export function setSessionKey(k: string | null) { _sessionKey = k; }
+
+// Injected automatically on every request
+function sessionHeaders() {
+  return _sessionKey ? { "X-Api-Key": _sessionKey } : {};
+}
+```
+
+The context provider calls `setSessionKey` on every state change, keeping the module-level value in sync. No localStorage, no cookies, no sandboxing issues.
+
+### 7. Mobile: sidebar consumes 100% viewport width
+
+On screens < 768px, the `w-56` sidebar had no breakpoint. It rendered at full-height, full-width, leaving `~0px` for the main content. Settings was entirely blank — the content area had zero width.
+
+The fix was architectural: replace the always-visible sidebar with a conditional layout — `hidden md:flex` on desktop, a fixed `translate-x` drawer on mobile with a backdrop overlay and a hamburger button in a top bar.
+
+```tsx
+// Desktop — always visible at ≥768px
+<aside className="hidden md:flex flex-col w-56 ...">
+
+// Mobile — slide-in drawer with z-50, backdrop at z-40
+<aside className={cn(
+  "fixed inset-y-0 left-0 z-50 flex flex-col w-72 md:hidden transition-transform",
+  open ? "translate-x-0" : "-translate-x-full"
+)}>
+```
+
+Also: `h-screen` replaced with `h-[100dvh]` to handle iOS Safari's dynamic viewport chrome (address bar appears/disappears on scroll, making `100vh` larger than the visible area).
 
 ---
 
 ## 🎓 Lessons learned
 
-### Always show something immediately
+### Always give the user something immediately
 
-The original flow used a complexity classifier before doing anything — an extra API call that classified the inquiry as "simple" or "complex" before routing to either a quick answer or the wizard. This meant users stared at a spinner while the classifier ran, then got different experiences depending on a classifier that wasn't always right.
+The original flow classified each query before doing anything — an extra API call to decide "simple" or "complex". Users waited for a classifier result, then got different UI paths depending on a model that was wrong ~20% of the time.
 
-The current flow is simpler and better: every inquiry always gets an immediate answer first. The user sees their inquiry is understood. The answer is real and useful. Then they choose to go deeper. The expert debate becomes the natural next step, not a hidden fast path.
+The current flow: every inquiry always gets a real answer in ~1–2 seconds. No classification, no branching. The user sees immediate value. The debate becomes an optional deepening, not a separate mode.
 
-**Always give the user something. Never make them wait for nothing.**
+**Never make the user wait for nothing.**
 
-### Heterogeneous panels beat homogeneous ones
+### The debate starter reduces friction at the exact right moment
 
-A panel of three GPT-4o instances produces a worse debate than GPT-4o + Claude + Llama + Mixtral. Different training data, different RLHF approaches, different knowledge cutoffs — genuine diversity produces genuine disagreement, and genuine disagreement produces genuine insight.
+After the quick answer, the user's real question is not "which models?" — it's "do I even need to debate this?" The three-option picker (Quick / Saved / Custom) answers that question at a glance. The full wizard only opens if explicitly requested. Removing one mandatory step from the common path meaningfully changes the feel of the product.
 
-The synthesis phase explicitly benefits from this: when Claude has pushed back on GPT-4o's framing, the synthesiser has real conflict to resolve, not just three versions of the same opinion.
+### Heterogeneous panels produce better debates
 
-### Temperature matters for debate quality
+Three instances of GPT-4o produce worse debates than GPT-4o + Claude + Gemini. Same training company, same RLHF approach — they agree on everything and call it consensus. Different providers mean genuinely different perspectives, different uncertainty estimates, and genuine conflict that the synthesis phase has something real to resolve.
 
-At temperature 0.7+, models explore wildly different framings and the synthesis struggles to reconcile them. At 0.3 or below, models converge fast but the debate loses its depth. For most research inquiries, 0.5–0.7 is the right range. For creative or speculative questions, push toward 0.8. For technical or factual questions, 0.3–0.5.
+**Model diversity is a feature, not a workaround.**
 
-### Reduce steps to the first decision point
+### Temperature 0.3 is the sweet spot for "reliable but interesting"
 
-The wizard used to be the first thing shown after the quick answer. But for most users the first real question is not "which models?" — it's "do I even need a full debate?" The debate starter answers that question first, with three options at a glance. The wizard only opens if the user explicitly wants more control. Ten lines of code, meaningfully better experience.
+High temperature (>0.7) produces wild divergence — models explore completely different framings and the synthesis struggles to reconcile them. Low temperature (<0.2) produces convergence without insight — models agree too fast on the least controversial answer. 0.3 is the Quick debate default for a reason: fast convergence on a real answer, with enough variance to surface genuine disagreement.
 
-### Custom model roles change everything
+### Custom model roles change the entire debate dynamic
 
-Giving each model a specific role — "you are a devil's advocate", "you focus only on empirical evidence", "you synthesise and find common ground" — produces a structured debate rather than each model just repeating variations of the same analysis. The custom system prompt per model is one of the most powerful features and one of the least obvious to new users. It deserves to be prominent.
+Without roles, each model independently analyses the question and repeats variations of the same structure. With roles — "you are a devil's advocate", "focus only on empirical evidence", "synthesise only, do not advocate" — the debate becomes structured. Models push against each other's frames rather than piling onto the same one. The final synthesis has genuine conflict to resolve.
 
-### SQLite is the right database for self-hosted tools
+This is the most powerful feature and the least obvious to new users.
 
-The choice of SQLite over PostgreSQL or MySQL was a deliberate one. For a tool designed to run on a single machine with one or a few concurrent users, a database server is pure operational overhead. SQLite is a file. It deploys with the app. It backs up with `cp`. It works offline. It never needs a connection string, a username, or a port. For this use case, it is strictly better than a client-server database in every dimension that matters.
+### Follow-ups are more natural than new sessions
+
+The original flow was: get answer → close → new inquiry → retype context. This is how most AI tools work, and it's wrong. Inquiry is iterative — you ask, learn something, refine, push back, explore a branch. The follow-up bar (visible after every completed inquiry) makes the natural loop zero-friction: the previous question and answer are visible as context, the new input is right there.
+
+### The onboarding key choice matters
+
+Offering "save to server" vs "this session only" at first run sounds like a minor UX detail. It's actually a meaningful trust decision for users evaluating whether to expose their API key to an unfamiliar self-hosted tool. The session-only option removes a blocker entirely — try the tool without commitment, decide later. Several users would never have entered their key without it.
+
+### SQLite is correct for self-hosted single-user tools
+
+The choice of SQLite over PostgreSQL was deliberate. For one machine, one or a few concurrent users: a database server is pure overhead. SQLite is a file. It deploys with the app. It backs up with `cp`. It never needs a connection string, a username, or a port. `better-sqlite3` is synchronous — no async plumbing, no connection pool management. For this use case, it is strictly better than a client-server database in every dimension that matters.
+
+### Split-panel beats modal for complex interactive UI
+
+Every time you put a multi-step form with dropdowns inside a Radix modal, you fight the modal's pointer event capture. The split-panel pattern — content left, panel slides in from right — eliminates the entire class of z-index, pointer capture, and focus management bugs. It's also better UX: the user can see both the original context and the new panel simultaneously.
 
 ---
 
 ## 🤖 Building with Perplexity Computer
 
-Mercury was designed and built entirely in collaboration with [Perplexity Computer](https://www.perplexity.ai). Every version — from the initial React + Express scaffold to the Fly.io deployment with custom domain — happened in a single persistent session context.
+Mercury was designed and built entirely in collaboration with [Perplexity Computer](https://www.perplexity.ai/computer). Every version — from the initial scaffold to the Fly.io deployment with custom domain, SSL, and DNS — happened in persistent session context.
 
 What that looks like in practice:
 
-**Architecture decisions were collaborative.** The 5-phase debate system, the initial-answer-first UX, the wizard flow, the portal-based dropdown — these were worked out in conversation, not handed down from a spec. When a design idea didn't work, the conversation course-corrected immediately.
+**Architecture decisions were collaborative.** The 5-phase debate system, the initial-answer-first UX, the debate starter, the split-panel wizard, the session-key approach — these were worked out in conversation. When a design idea didn't work, the conversation course-corrected immediately without losing context.
 
-**Every production bug was fixed in context.** The `fcntl64` crash appeared in Fly.io logs. The em dash header error appeared in the browser console. The WebSocket proxy bug appeared in a deploy preview. Each was diagnosed and fixed without leaving the conversation. No GitHub issues, no Slack threads, no context switching.
+**Every production bug was diagnosed in context.** The `fcntl64` crash in Fly.io logs. The em dash header error in the browser console. The stale React Query cache blocking onboarding. The Radix Dialog pointer capture. Each was identified and fixed without leaving the session — no GitHub issues, no Slack threads, no context switching.
 
-**The deployment chain was automated.** Fly.io app creation, volume provisioning, SSL cert issuance, DNS record management (SiteGround), FTP landing page uploads — all handled in the same session, incrementally, with verification at each step.
+**The full deployment chain was automated.** Fly.io app creation, volume provisioning, SSL cert issuance, DNS management, FTP uploads for the landing page — all handled incrementally in the same conversation.
 
-**The codebase is intentionally readable.** Because all code was written to be reviewed in conversation, every module has clear section comments, consistent naming, and no clever abstractions that would be hard to explain. The code reads like it was written for a human to maintain — because it was, even if an AI wrote it.
+**The codebase was written to be readable in conversation.** Clear section comments, consistent naming, no clever abstractions that can't be explained in one sentence. The code was written for a human to understand and maintain — even though an AI produced it.
 
-This is what it looks like to use AI as a serious engineering partner. Not autocomplete. A collaborator that holds full context across 10,000+ lines, reasons about tradeoffs in real time, and catches bugs you'd spend hours finding alone.
+This is what serious AI-assisted engineering looks like. Not autocomplete. A collaborator that holds 10,000+ lines of context, reasons about tradeoffs in real time, and catches the bugs you'd spend hours finding alone.
 
 ---
 
@@ -448,27 +523,27 @@ This is what it looks like to use AI as a serious engineering partner. Not autoc
 mercury/
 ├── client/src/
 │   ├── pages/
-│   │   ├── chat.tsx          Inquiry input, immediate answer, wizard launch
-│   │   ├── session.tsx       Live progress panel, debate history, results
-│   │   ├── workflows.tsx     Workflow CRUD with portal search dropdown
-│   │   ├── settings.tsx      API key, theme, danger zone
-│   │   └── onboarding.tsx    First-run API key setup
+│   │   ├── chat.tsx          Inquiry input, quick answer, debate starter, follow-up
+│   │   ├── session.tsx       Live progress, debate history, results, follow-up bar
+│   │   ├── workflows.tsx     Workflow CRUD — split-panel form, model search
+│   │   ├── settings.tsx      Multi-key manager, session key, theme, danger zone
+│   │   └── onboarding.tsx    First-run — save to server vs session-only choice
 │   ├── components/
-│   │   └── Layout.tsx        Sidebar, navigation, theme toggle
+│   │   └── Layout.tsx        Responsive sidebar (desktop always-on, mobile drawer)
 │   ├── lib/
-│   │   └── queryClient.ts    Relative URL helper + TanStack Query client
-│   └── App.tsx               ThemeProvider + onboarding guard + routing
+│   │   └── queryClient.ts    Session key injection, relative URL helper, TanStack Query
+│   └── App.tsx               ThemeProvider + SessionKeyProvider + onboarding guard
 ├── server/
-│   ├── orchestrator.ts       Debate engine, quick answer, phase system
-│   ├── routes.ts             All Express routes + WebSocket server
-│   ├── storage.ts            SQLite via Drizzle ORM
+│   ├── orchestrator.ts       Debate engine, quick answer, 5-phase system, WebSocket
+│   ├── routes.ts             Express routes, key resolution, WebSocket server
+│   ├── storage.ts            SQLite via Drizzle ORM — sessions, keys, workflows
 │   └── index.ts              Express + HTTP server bootstrap
 ├── shared/
-│   └── schema.ts             Sessions, iterations, workflows, settings
-├── fly.toml                  Fly.io config (CDG region, auto-stop, volume)
-├── Dockerfile                Alpine + native module rebuild pattern
+│   └── schema.ts             Drizzle schema: sessions, iterations, workflows, api_keys, settings
+├── fly.toml                  Fly.io config (CDG region, auto-stop, volume mount)
+├── Dockerfile                Alpine + double npm rebuild for better-sqlite3
 ├── CHANGELOG.md              Full version history
-└── INSTALL.md                Local, Docker, Fly.io deployment guide
+└── INSTALL.md                Local, Docker, and Fly.io deployment guide
 ```
 
 ---
@@ -478,13 +553,18 @@ mercury/
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/onboarding` | `{ hasApiKey: boolean }` |
-| `GET/POST` | `/api/settings` | API key status / save or clear key |
+| `GET/POST` | `/api/settings` | API key status / save or clear legacy key |
 | `GET/POST` | `/api/settings/theme` | Theme persistence |
+| `GET` | `/api/keys` | List all saved API keys (values masked) |
+| `POST` | `/api/keys` | Add a new API key with label |
+| `POST` | `/api/keys/:id/primary` | Set a key as primary |
+| `DELETE` | `/api/keys/:id` | Delete a saved key |
+| `POST` | `/api/keys/migrate-legacy` | Migrate old settings key to the key manager |
 | `GET` | `/api/models` | All models available on OpenRouter |
-| `POST` | `/api/quick-answer` | Immediate single-model response |
+| `POST` | `/api/quick-answer` | Immediate single-model response (gpt-4o-mini) |
 | `POST` | `/api/inquire` | Launch full multi-model debate |
-| `GET` | `/api/sessions` | List all sessions (newest first) |
-| `GET` | `/api/sessions/:id` | Session with status and final answer |
+| `GET` | `/api/sessions` | List all sessions, newest first |
+| `GET` | `/api/sessions/:id` | Session status and final answer |
 | `DELETE` | `/api/sessions/:id` | Delete a session |
 | `DELETE` | `/api/sessions` | Delete all sessions |
 | `GET` | `/api/sessions/:id/iterations` | Full debate history |
@@ -502,18 +582,22 @@ mercury/
 | `completed` | `finalAnswer` |
 | `error` | `message` |
 
+**Session key header:**
+
+Pass `X-Api-Key: sk-or-v1-...` on any request to use a session-only key. The server resolves keys in this order: `X-Api-Key` header → primary saved key → legacy setting.
+
 ---
 
 ## 🧪 Model recommendations
 
 | Use case | Team |
 |---|---|
-| **Balanced all-round** | `openai/gpt-4o` + `anthropic/claude-3.5-sonnet` + `meta-llama/llama-4-maverick` + `mistralai/mixtral-large` |
-| **Budget** | `openai/gpt-4o-mini` + `anthropic/claude-haiku-4.5` + `meta-llama/llama-3.2-3b` |
-| **Deep research** | `openai/o3-mini` + `anthropic/claude-3.7-sonnet` + `google/gemini-2.0-flash` + `deepseek/deepseek-r1` |
-| **Structured debate** | Mix of above + assign explicit roles per model (researcher, critic, synthesiser, fact-checker) |
+| **Balanced all-round** | `openai/gpt-4o` + `anthropic/claude-3.5-sonnet` + `google/gemini-2.0-flash` + `meta-llama/llama-4-maverick` |
+| **Budget** | `openai/gpt-4o-mini` + `anthropic/claude-haiku` + `google/gemini-flash-lite` |
+| **Deep research** | `openai/o3-mini` + `anthropic/claude-3.7-sonnet` + `google/gemini-2.0-pro` + `deepseek/deepseek-r1` |
+| **Structured debate** | Any mix above + assign explicit roles (researcher, critic, synthesiser, fact-checker) |
 
-Key insight: **diversity beats raw capability**. Three different mid-tier models from different providers outperform three instances of the same frontier model. Different training histories mean genuinely different perspectives.
+Key insight: **diversity beats raw capability**. Three different mid-tier models from different providers outperform three instances of the same frontier model. Different training histories mean genuinely different perspectives — and genuine disagreement is what the synthesis phase needs to produce real insight.
 
 ---
 
@@ -521,7 +605,7 @@ Key insight: **diversity beats raw capability**. Three different mid-tier models
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
-Current: **v3.6.0** — debate starter (Quick debate / saved workflow / custom setup), split-panel wizard, model selection fixed, version-stamped releases.
+Current: **v3.6.0** — follow-up inquiry, multi-key management, session-only key, mobile layout, debate starter, split-panel wizard, version-stamped releases.
 
 ---
 
