@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.6.0] — 2026-03-29
+
+### Added
+- **Follow-up inquiry** — after any completed inquiry, a "Ask a follow-up" input appears so you can continue the thread without starting from scratch.
+  - On the **chat page**: accepting a quick answer collapses it into a compact context card and reveals a follow-up input with auto-focus. The previous question and answer are shown as context above the new input.
+  - On the **session page**: after a full debate or quick answer completes, a follow-up bar appears at the bottom of the page. Submitting navigates back to the chat page, auto-fills the new inquiry, and fires it immediately.
+- **URL pre-fill** — `?q=` query param on `/chat` pre-populates and auto-fires the inquiry. Used internally by the session follow-up, but also useful for deep-linking.
+
+---
+
 ## [3.5.0] — 2026-03-29
 
 ### Added
