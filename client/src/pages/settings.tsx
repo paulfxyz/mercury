@@ -64,7 +64,7 @@ export default function SettingsPage() {
   return (
     <Layout>
       <div className="h-full overflow-y-auto">
-        <div className="max-w-xl mx-auto px-4 py-6 space-y-5">
+        <div className="max-w-xl mx-auto px-4 py-6 pb-12 space-y-5">
 
           {/* Header */}
           <div>

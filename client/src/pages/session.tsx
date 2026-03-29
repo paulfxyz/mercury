@@ -263,7 +263,7 @@ function Results({ session, iterations, isQuick }: { session: Session; iteration
               {isQuick ? "Answer" : "Consensus Answer"}
             </span>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <button
               data-testid="btn-copy-answer"
               onClick={copy}
@@ -391,7 +391,7 @@ export default function SessionPage() {
   return (
     <Layout>
       <div className="h-full overflow-y-auto">
-        <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+        <div className="max-w-2xl mx-auto px-4 py-6 pb-12 space-y-5">
           {/* Header */}
           <div className="flex items-start gap-3">
             <button

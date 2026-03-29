@@ -355,7 +355,7 @@ function InquiryWizard({
               <p className="text-sm font-medium text-foreground mb-0.5">How many experts in your team?</p>
               <p className="text-xs text-muted-foreground">More experts = richer debate, higher cost. 3–5 is the sweet spot.</p>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 sm:grid-cols-4 gap-2">
               {[2, 3, 4, 5, 6, 8, 10, 12].map(n => (
                 <button
                   key={n}
@@ -701,9 +701,9 @@ export default function ChatPage() {
         {/* ── Left: chat panel ── */}
         <div className={cn(
           "flex flex-col h-full transition-all duration-300 ease-in-out",
-          showWizard ? "flex-1 min-w-0" : "w-full"
+          showWizard ? "hidden sm:flex flex-1 min-w-0" : "w-full"
         )}>
-          <div className="flex-1 flex flex-col items-center justify-center p-6 overflow-y-auto">
+          <div className="flex-1 flex flex-col items-center justify-center px-4 py-5 sm:p-6 overflow-y-auto">
             <div className={cn(
               "w-full space-y-5 animate-fade-in-up transition-all duration-300",
               showWizard ? "max-w-xl" : "max-w-2xl"
@@ -712,8 +712,8 @@ export default function ChatPage() {
               {/* Hero */}
               {!quickMode && !showWizard && (
                 <div className="text-center space-y-2">
-                  <div className="text-4xl select-none">☿</div>
-                  <h1 className="text-xl font-semibold text-foreground">What do you want to inquire?</h1>
+                  <div className="text-3xl sm:text-4xl select-none">☿</div>
+                  <h1 className="text-lg sm:text-xl font-semibold text-foreground">What do you want to inquire?</h1>
                   <p className="text-sm text-muted-foreground max-w-sm mx-auto">
                     Every inquiry gets an instant answer, then you can run the full expert debate.
                   </p>
@@ -738,7 +738,8 @@ export default function ChatPage() {
                   rows={3}
                 />
                 <div className="flex items-center justify-between px-4 py-3">
-                  <span className="text-xs text-muted-foreground">⌘+Enter to send</span>
+                  <span className="hidden sm:inline text-xs text-muted-foreground">⌘+Enter to send</span>
+                  <span className="sm:hidden text-xs text-muted-foreground">Tap to send</span>
                   <Button
                     data-testid="btn-submit-query"
                     size="sm"
@@ -803,7 +804,7 @@ export default function ChatPage() {
         {/* ── Right: wizard panel ── */}
         <div className={cn(
           "flex-shrink-0 overflow-hidden transition-all duration-300 ease-out",
-          showWizard ? "w-full sm:w-[480px]" : "w-0"
+          showWizard ? "w-full sm:w-[480px]" : "w-0 h-0"
         )}>
           {showWizard && (
             <InquiryWizard

@@ -232,7 +232,7 @@ function WorkflowFormPanel({
         </div>
 
         {/* Sliders */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-medium text-foreground">Rounds</label>
@@ -336,7 +336,7 @@ export default function WorkflowsPage() {
     <Layout>
       <div className="flex h-full overflow-hidden">
         {/* ── List ── */}
-        <div className={cn("flex-1 min-w-0 overflow-y-auto transition-all duration-300", panelOpen && "hidden sm:block")}>
+        <div className={cn("flex-1 min-w-0 overflow-y-auto transition-all duration-300", panelOpen && "hidden md:block")}>
           <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -440,7 +440,7 @@ export default function WorkflowsPage() {
         {/* ── Form panel — slides in from right ── */}
         <div className={cn(
           "flex-shrink-0 overflow-hidden transition-all duration-300 ease-out",
-          panelOpen ? "w-full sm:w-[480px]" : "w-0"
+          panelOpen ? "w-full md:w-[480px]" : "w-0"
         )}>
           {panelOpen && (
             <WorkflowFormPanel

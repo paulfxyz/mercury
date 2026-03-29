@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.4.0] — 2026-03-29
+
+### Added
+- **Mobile-first layout** — full responsive overhaul across all pages.
+- **Collapsible sidebar** — on mobile the sidebar is hidden by default; a hamburger button (☰) in the top bar opens a slide-in drawer with a dark backdrop overlay. Tapping the backdrop or any nav link closes it automatically.
+- **Mobile top bar** — persistent header on mobile shows the Mercury logo, the hamburger, and a compact "+ New" button for quick access.
+
+### Changed
+- `Layout.tsx` rewritten: `hidden md:flex` desktop sidebar + fixed drawer for mobile (`z-50`, `translate-x` transition, backdrop `z-40`).
+- `h-screen` replaced with `h-[100dvh]` to account for dynamic browser chrome on iOS Safari.
+- `chat.tsx` — wizard panel takes full width on mobile (`w-full`), chat panel hides while wizard is open; padding adjusted for small screens; hint text changes from ⌘+Enter to “Tap to send”.
+- `workflows.tsx` — slider grid `grid-cols-3` → `grid-cols-1 sm:grid-cols-3`; form panel full-width on mobile.
+- `session.tsx` — added bottom padding (`pb-12`) for comfortable scroll; action button row uses `flex-wrap`.
+- `settings.tsx` — added bottom padding; page now correctly fills the screen when sidebar is hidden on mobile.
+
+### Fixed
+- Settings page was entirely blank on mobile — caused by sidebar consuming 100% of viewport width.
+- Wizard panel was unreachable on mobile (hidden behind sidebar).
+- Sliders in the workflow form overlapped on small screens.
+
+---
+
 ## [3.1.1] — 2026-03-28
 
 ### Changed
