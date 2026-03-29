@@ -12,6 +12,7 @@ import {
   ArrowLeft, Trash2, Copy, CheckCheck, Download, ChevronDown, ChevronUp,
   Eye, EyeOff, Loader2, CheckCircle2, AlertTriangle,
   FlaskConical, MessageCircle, Vote, BarChart3, Award, Sparkles, Zap,
+  CornerDownRight, ArrowUp,
 } from "lucide-react";
 import type { Session, Iteration } from "@shared/schema";
 
@@ -178,6 +179,52 @@ function IterCard({ iter, idx }: { iter: LiveIteration; idx: number }) {
 }
 
 // ─── Results section ──────────────────────────────────────────
+// ─── Follow-up bar ───────────────────────────────────────────────
+function FollowUpBar({ answer, onSubmit }: { answer: string; onSubmit: (q: string) => void }) {
+  const [followUp, setFollowUp] = useState("");
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const ta = ref.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 180) + "px";
+  }, [followUp]);
+
+  return (
+    <div className="border border-border rounded-xl overflow-hidden bg-card animate-fade-in-up">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
+        <CornerDownRight className="w-3.5 h-3.5 text-muted-foreground" />
+        <span className="text-xs font-semibold text-foreground">Ask a follow-up</span>
+        <span className="text-xs text-muted-foreground ml-1">— continue this thread with a new inquiry.</span>
+      </div>
+      <textarea
+        ref={ref}
+        value={followUp}
+        onChange={e => setFollowUp(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (followUp.trim()) onSubmit(followUp.trim()); }
+        }}
+        placeholder="Dig deeper, challenge the answer, or explore a related angle…"
+        className="w-full border-0 outline-none resize-none text-sm leading-relaxed bg-transparent px-4 pt-3 pb-2 text-foreground placeholder:text-muted-foreground min-h-[72px]"
+        rows={2}
+        data-testid="input-session-followup"
+      />
+      <div className="flex items-center justify-between px-4 py-3">
+        <span className="hidden sm:inline text-xs text-muted-foreground">⌘+Enter to send</span>
+        <span className="sm:hidden text-xs text-muted-foreground">Tap to send</span>
+        <button
+          onClick={() => { if (followUp.trim()) onSubmit(followUp.trim()); }}
+          disabled={!followUp.trim()}
+          className="inline-flex items-center gap-1.5 text-xs font-medium px-3 h-8 rounded-lg bg-foreground text-background hover:opacity-90 transition-opacity disabled:opacity-40"
+        >
+          Inquire <ArrowUp className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Results({ session, iterations, isQuick }: { session: Session; iterations: Iteration[]; isQuick?: boolean }) {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
@@ -540,6 +587,9 @@ export default function SessionPage() {
 
           {/* ── Results ── */}
           {isCompleted && <Results session={session} iterations={storedIters} isQuick={isQuick} />}
+
+          {/* ── Follow-up bar ── */}
+          {isCompleted && <FollowUpBar answer={session.finalAnswer ?? session.quickAnswer ?? ""} onSubmit={(q) => navigate(`/chat?q=${encodeURIComponent(q)}`)} />}
 
           {/* ── Error ── */}
           {isError && (
