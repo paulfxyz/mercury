@@ -5,7 +5,7 @@ import { useTheme } from "@/App";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
-  MessageSquare, GitBranch, Settings, Sun, Moon,
+  GitBranch, Settings, Sun, Moon,
   Plus, Clock, Menu, X,
 } from "lucide-react";
 import type { Session } from "@shared/schema";
@@ -92,7 +92,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Nav links */}
       <div className="px-2 space-y-0.5 flex-shrink-0">
-        {navLink("/chat", <MessageSquare className="w-4 h-4" />, "Inquire")}
         {navLink("/workflows", <GitBranch className="w-4 h-4" />, "Workflows")}
         {navLink("/settings", <Settings className="w-4 h-4" />, "Settings")}
       </div>

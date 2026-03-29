@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.4.1] — 2026-03-29
+
+### Changed
+- **Sidebar** — removed the duplicate "Inquire" nav link; "New Inquiry" at the top already serves this purpose.
+
+---
+
 ## [3.4.0] — 2026-03-29
 
 ### Added
