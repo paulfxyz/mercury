@@ -61,7 +61,7 @@
 
 ## 👨‍💻 Why this exists
 
-I'm **Paul Fleury** — French internet entrepreneur based in Lisbon. I run [Openline](https://openline.ai) and build across a wide surface: infrastructure, automation, AI tooling, SaaS.
+I'm **Paul Fleury** — French internet entrepreneur based in Lisbon. I run [Openline](https://openline.com)) and build across a wide surface: infrastructure, automation, AI tooling, SaaS.
 
 I kept hitting the same wall with AI assistants. Not that they were wrong — but that I had no reliable way to *know* when they were wrong.
 
@@ -75,7 +75,7 @@ Mercury applies this to AI. Your inquiry goes through a configurable panel of mo
 
 The result is not just an answer. It's a **debugged answer**.
 
-> 💡 Designed and built entirely in collaboration with **[Perplexity Computer](https://www.perplexity.ai)** — architecture through implementation, production bugs, deployment, and documentation. Human intent + AI execution, end to end.
+> 💡 Designed and built entirely in collaboration with **[Perplexity Computer](https://www.perplexity.com)** — architecture through implementation, production bugs, deployment, and documentation. Human intent + AI execution, end to end.
 
 ---
 
