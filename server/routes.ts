@@ -251,7 +251,7 @@ export function registerRoutes(httpServer: Server, app: Express) {
 
     const debateQuery = queryOverride?.trim() || parent.query;
 
-    // Create a new child session for this debate run
+    // Create a child session for this debate — parentId marks it as hidden from sidebar
     const child = storage.createSession({
       title: parent.title,
       query: debateQuery,
@@ -263,7 +263,8 @@ export function registerRoutes(httpServer: Server, app: Express) {
       finalAnswer: null,
       quickAnswer: null,
       workflowId: workflowId ?? null,
-    });
+      parentId: req.params.id,  // marks this as a child — hidden from sidebar, redirects to parent
+    } as any);
 
     // Register child debate on parent (parent never changes status)
     storage.appendDebate(req.params.id, child.id, debateQuery);

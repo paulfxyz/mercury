@@ -1001,6 +1001,13 @@ export default function SessionPage() {
     </Layout>
   );
 
+  // Child debate sessions redirect to their parent
+  const parentId = (session as any).parentId;
+  if (parentId) {
+    navigate(`/session/${parentId}`);
+    return null;
+  }
+
   return (
     <Layout>
       <div className="flex h-full overflow-hidden">

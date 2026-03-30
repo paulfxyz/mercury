@@ -73,6 +73,7 @@ for (const col of [
   "ALTER TABLE sessions ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0;",
   "ALTER TABLE sessions ADD COLUMN follow_ups TEXT NOT NULL DEFAULT '[]';",
   "ALTER TABLE sessions ADD COLUMN debates TEXT NOT NULL DEFAULT '[]';",
+  "ALTER TABLE sessions ADD COLUMN parent_id TEXT;",
   "ALTER TABLE workflows ADD COLUMN temperature REAL NOT NULL DEFAULT 0.7;",
   "ALTER TABLE workflows ADD COLUMN consensus_threshold REAL NOT NULL DEFAULT 0.7;",
 ]) {
@@ -120,7 +121,11 @@ export const storage: IStorage = {
     return db.select().from(sessions).where(eq(sessions.id, s.id)).get()!;
   },
   getSession(id) { return db.select().from(sessions).where(eq(sessions.id, id)).get(); },
-  listSessions() { return db.select().from(sessions).orderBy(desc(sessions.createdAt)).all(); },
+  listSessions() {
+    // Only return root sessions (no parentId) — child debate sessions stay hidden
+    return db.select().from(sessions).orderBy(desc(sessions.createdAt)).all()
+      .filter(s => !(s as any).parentId);
+  },
   updateSession(id, data) {
     db.update(sessions).set(data as any).where(eq(sessions.id, id)).run();
     return db.select().from(sessions).where(eq(sessions.id, id)).get();

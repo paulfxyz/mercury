@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.7.5] — 2026-03-30
+
+### Fixed
+- **Child debate sessions hidden from sidebar** — debate child sessions now have a `parentId` column set. `listSessions()` filters them out, so they never appear in the sidebar or recent list.
+- **Child sessions redirect to parent** — if a child session URL is opened directly (e.g. from browser history), the session page immediately redirects to `/session/:parentId`.
+- `parent_id` column added to sessions table via safe `ALTER TABLE` migration.
+
+---
+
 ## [3.7.4] — 2026-03-30
 
 ### Fixed
