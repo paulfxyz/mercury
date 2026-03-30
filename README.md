@@ -36,7 +36,7 @@
 
 ---
 
-> This README is a complete technical reference — not just *how* to run Mercury, but *why* every decision was made, the exact bugs that surfaced in production, and the lessons learned building a multi-model consensus engine from scratch. If you're building something similar, read on.
+> This README is a complete technical reference — not just *how* to run Mercury, but *why* every decision was made, the exact bottlenecks hit in production, the specific bugs and how they were fixed, and the lessons learned building a multi-model consensus engine from scratch. If you're building anything like this, read on carefully.
 
 ---
 
@@ -48,14 +48,15 @@
 4. [Quick start](#-quick-start)
 5. [Deploy to Fly.io](#-deploy-to-flyio)
 6. [Architecture deep dive](#-architecture--how-it-works)
-7. [The hardest bugs](#-the-hardest-bugs)
-8. [Lessons learned](#-lessons-learned)
-9. [Building with Perplexity Computer](#-building-with-perplexity-computer)
-10. [Project structure](#-project-structure)
-11. [API reference](#-api-reference)
-12. [Model recommendations](#-model-recommendations)
-13. [Changelog](#-changelog)
-14. [Author](#-author)
+7. [Bottlenecks & design constraints](#-bottlenecks--design-constraints)
+8. [The hardest bugs](#-the-hardest-bugs)
+9. [Lessons learned](#-lessons-learned)
+10. [Building with Perplexity Computer](#-building-with-perplexity-computer)
+11. [Project structure](#-project-structure)
+12. [API reference](#-api-reference)
+13. [Model recommendations](#-model-recommendations)
+14. [Changelog](#-changelog)
+15. [Author](#-author)
 
 ---
 
@@ -126,7 +127,17 @@ Each phase has a purpose-built system prompt. The live panel is open by default 
 
 ### Step 5 — Follow up
 
-After any completed inquiry — quick answer or full debate — a follow-up bar appears. Type a new question, hit send, and it fires as a new inquiry with the previous context visible. The thread continues naturally, no navigation required.
+After any completed answer a follow-up bar appears at the bottom of the session. You stay on the same page — the thread grows downward. The previous question and answer remain visible above.
+
+If you ran a debate, the follow-up appears after the debate answer. You can then launch a debate on the follow-up too — the sequence becomes:
+
+```
+Initial answer → Debate → Follow-up answer → Follow-up debate → …
+```
+
+Everything is append-only. Nothing mutates. The full thread — in correct chronological order — is always on screen.
+
+> **Important constraint**: only one debate can run at a time. The follow-up input bar is locked while any debate is in progress. This is enforced at two levels: the server rejects new debates with `409 Conflict` if any child session has `status=running`, and the client hides the input and shows a progress indicator until the running debate clears.
 
 ---
 
@@ -271,19 +282,35 @@ function resolveApiKey(req: Request): string | undefined {
 
 The session key is set in React state and injected by `queryClient.ts` as an `X-Api-Key` header on every request. It never touches the database or localStorage.
 
-### Follow-up inquiry chain (v3.6+)
+### Follow-up + debate thread model (v3.7+)
 
-```
-Session completes
-  → FollowUpBar renders at bottom
-  → User types follow-up
-  → navigate("/chat?q=<encoded>")
-  → chat.tsx reads ?q= on mount
-  → auto-fires quickMutation after 80ms
-  → new inquiry starts, accepted context visible above
+Each session is a parent record. When you run a debate, a child session is created with `parentId` set and is excluded from the sidebar (`listSessions` filters on `parentId IS NULL`). If a child URL is opened directly, the session page immediately redirects to the parent.
+
+Follow-ups are stored as a `followUps` JSON column on the parent session — an append-only array of `{ query, answer, createdAt }` objects. Each follow-up fires `POST /api/sessions/:id/followup`, which calls `gpt-4o-mini` for a quick answer and appends the result to the array.
+
+Debates are stored as a `debates` JSON column — an array of `{ sessionId, query, createdAt }` entries pointing at child sessions.
+
+On the frontend, the session page builds a **merged timeline** from both arrays, sorted by `createdAt`:
+
+```typescript
+// Initial debates (before first follow-up)
+const initialDebates = debates.filter(d => d.createdAt < firstFollowUpTs);
+
+// Each follow-up, followed by any debate it spawned
+const timeline = [
+  ...initialDebates.map(d => ({ kind: "debate", entry: d })),
+  ...followUps.map((fu, i) => ({
+    kind: "followup",
+    entry: fu,
+    relatedDebates: debates.filter(
+      d => d.createdAt > fu.createdAt &&
+           d.createdAt < (followUps[i+1]?.createdAt ?? Infinity)
+    ),
+  })),
+];
 ```
 
-The `?q=` URL param approach means follow-ups are also deep-linkable — send someone a pre-filled inquiry URL and it fires automatically on load.
+This guarantees correct reading order regardless of how many debates and follow-ups are interleaved, and survives concurrent updates from polling without re-ordering visible content.
 
 ### Real-time WebSocket
 
@@ -305,6 +332,86 @@ settings    — key-value: legacy API key, theme
 ```
 
 `better-sqlite3` is fully synchronous — no async/await on database calls. Drizzle provides type-safe queries. The database is a single file at `mercury.db` locally or `/app/data/mercury.db` on Fly.io (persistent volume).
+
+---
+
+## ⚡ Bottlenecks & design constraints
+
+Building a multi-model debate engine surfaces constraints you don't hit in standard CRUD apps. These are the real ones.
+
+### 1. The cold start latency problem
+
+A full debate — 3 models × 10 rounds = 30 API calls — takes 60–180 seconds depending on model and prompt length. Nothing about this can be made faster: models have minimum response latencies and the debate is sequential by design (each round builds on the previous).
+
+The solution was architectural: **decouple the two latency tiers**. The initial `gpt-4o-mini` call takes ~1–2 seconds. The debate is optional and clearly labelled. Users almost never abandon because they had *something* immediately. Without the quick answer, the blank-screen wait kills engagement entirely.
+
+**There is no way to make a 10-round debate fast. The correct answer is to make it optional.**
+
+### 2. Polling vs WebSocket for live progress
+
+Mercury uses WebSocket for real-time debate streaming. The original prototype used polling (`setInterval` every 1.5s) but hit two problems:
+- Multiple browser tabs caused duplicated state updates
+- The poll interval was always wrong: too fast (wasted requests) or too slow (visible lag)
+
+WebSocket solves both. One connection per session, server pushes events exactly when they happen. The tradeoff: connection management complexity. The WS server must handle disconnect/reconnect gracefully and not leak connections when sessions complete. Fly.io's proxy terminates idle connections after 60s — the client reconnects automatically on `close`.
+
+For the *session status* (completed/running) the app still polls at 1.2s. This covers the edge case where the WebSocket was not connected at completion time (e.g. page refresh mid-debate).
+
+### 3. Concurrent debate prevention
+
+Early versions had no guard against launching multiple simultaneous debates. Users found this by accident — double-clicking the debate button fired two parallel child sessions, each writing to the same parent's `debates[]` array. The result was a race condition: whichever finished last won, and the other's data was overwritten.
+
+The fix required two layers:
+
+**Server-side** (`routes.ts`):
+```typescript
+// Reject if any child session is still running
+const children = storage.getChildSessions(sessionId);
+if (children.some(c => c.status === "running")) {
+  return res.status(409).json({ error: "A debate is already running." });
+}
+```
+
+**Client-side** (`session.tsx`):
+```typescript
+// Poll the last child's status every 2s while it may be running
+const isAnyDebateRunning = debateMutation.isPending ||
+  (!!lastDebateId && (!lastDebateSession || lastDebateSession.status === "running"));
+
+// Gate everything behind this flag
+{isAnyDebateRunning ? <LockedIndicator /> : <DebateStarter />}
+```
+
+The server check is the authoritative guard. The client check is UX — it hides the button so users never see a rejection.
+
+### 4. Append-only state vs React re-render order
+
+The thread model (follow-ups + debates stored as JSON columns) means new entries are appended server-side and the client receives them via polling. The naive render approach — `debates.map(...)` then `followUps.map(...)` — produces wrong order the moment a follow-up spawns its own debate: the debate block renders above the follow-up that triggered it.
+
+The fix is the merged timeline (see architecture section). The key invariant: **render order must be derived from `createdAt` timestamps, never from array index order**.
+
+This matters most during live updates. When React re-renders due to a poll result, the timeline is recomputed from scratch. Because timestamps are immutable and monotonically increasing, the timeline is stable across re-renders — no items jump position.
+
+### 5. SQLite write concurrency on single-instance Fly
+
+`better-sqlite3` is synchronous and SQLite uses file-level locking. In theory, two simultaneous requests that both write to the database should serialize automatically. In practice, the bottleneck is the orchestrator: debate rounds fire sequential writes over 60–180 seconds.
+
+For the current use case (self-hosted, small concurrent user base) this is fine. The full debate write pattern is: `INSERT iteration` per round + `UPDATE session` on completion. These are fast writes, not table scans. The p99 latency of a write during a debate is <5ms even under concurrent read pressure.
+
+If Mercury were multi-tenant at scale, the right move would be a write queue (single writer goroutine / worker) or PostgreSQL with `FOR UPDATE SKIP LOCKED`. For self-hosted single-user: SQLite is the correct choice, and the file-level lock is a feature, not a bug.
+
+### 6. The DebateStarter UX hierarchy problem
+
+The first instinct was to always show a `DebateStarter` after every block — after the quick answer, after each debate, after each follow-up. This produced chaotic UX: users launched chain debates on debate answers, creating orphaned child sessions with no follow-up context.
+
+The final rule, arrived at after several iterations:
+
+- `DebateStarter` appears **only** after the initial quick answer (if no debate has been launched yet)
+- After a debate completes, the `DebateStarter` disappears — only a `FollowUpBar` remains
+- After a follow-up answer, a new `DebateStarter` appears — scoped to the follow-up's query
+- While any debate is running: both `DebateStarter` and `FollowUpBar` are hidden
+
+This hierarchy enforces the intended mental model: **debate deepens an answer, follow-up advances the conversation**. You can only debate something you've actually read and decided to challenge.
 
 ---
 
@@ -605,7 +712,7 @@ Key insight: **diversity beats raw capability**. Three different mid-tier models
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
-Current: **v3.7.8** — follow-up inquiry, multi-key management, session-only key, mobile layout, debate starter, split-panel wizard, version-stamped releases.
+Current: **v3.7.8** — append-only debate child sessions, merged chronological timeline, one-debate-at-a-time guard, follow-up lock during debates, multi-key management, session-only key, mobile layout, split-panel wizard.
 
 ---
 
