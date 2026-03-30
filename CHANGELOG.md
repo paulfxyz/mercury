@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.7.3] — 2026-03-30
+
+### Fixed
+- **Markdown rendering** — complete rewrite of `renderMarkdown` as a proper line-by-line parser. Lists no longer get wrapped in `<p>` tags. Headings don't get double-wrapped. Unordered and ordered lists open/close cleanly. Bullet points now render correctly everywhere (quick answers, debate results, follow-ups).
+- **Chronological render order** — session page now always shows content in strict order: initial quick answer → debate starter (if no debate yet) → debate history (rounds) → consensus answer → follow-ups → follow-up input.
+- **Quick answer always visible** — the initial `gpt-4o-mini` answer is always shown at the top of the session, even after a full debate runs on top of it. It is labelled "Initial answer" with a note pointing to the debate below.
+- **Separate `hasQuickAnswer` / `hasDebate` flags** replace the ambiguous `isQuick` boolean. The render logic is now explicit and correct in all combinations.
+- **Quick answer visible during running debate** — the initial answer stays visible while the expert debate is streaming.
+
+---
+
 ## [3.7.2] — 2026-03-30
 
 ### Fixed

@@ -49,19 +49,64 @@ const PHASE_CFG: Record<string, { icon: React.ElementType; label: string; color:
 const PHASES = ["research", "debate", "vote", "synthesis", "final"];
 
 function renderMarkdown(md: string): string {
-  return md
-    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
-    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
-    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+  if (!md) return "";
+  const lines = md.split("\n");
+  const out: string[] = [];
+  let inUl = false;
+  let inOl = false;
+
+  const closeList = () => {
+    if (inUl) { out.push("</ul>"); inUl = false; }
+    if (inOl) { out.push("</ol>"); inOl = false; }
+  };
+
+  // Inline: bold, italic, code, inline-code
+  const inline = (s: string) => s
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/`(.+?)`/g, "<code>$1</code>")
-    .replace(/^> (.+)$/gm, "<blockquote>$1</blockquote>")
-    .replace(/^- (.+)$/gm, "<li>$1</li>")
-    .replace(/(<li>.*<\/li>\n?)+/g, "<ul>$&</ul>")
-    .replace(/^(\d+)\. (.+)$/gm, "<li>$2</li>")
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/^(?!<[hubol])(.+)$/gm, (m) => m.trim() ? `<p>${m}</p>` : "");
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Headings
+    if (/^### (.+)$/.test(line)) { closeList(); out.push(`<h3>${inline(line.slice(4))}</h3>`); continue; }
+    if (/^## (.+)$/.test(line))  { closeList(); out.push(`<h2>${inline(line.slice(3))}</h2>`); continue; }
+    if (/^# (.+)$/.test(line))   { closeList(); out.push(`<h1>${inline(line.slice(2))}</h1>`); continue; }
+
+    // Blockquote
+    if (/^> (.+)$/.test(line)) { closeList(); out.push(`<blockquote>${inline(line.slice(2))}</blockquote>`); continue; }
+
+    // Unordered list
+    if (/^[-*] (.+)$/.test(line)) {
+      if (inOl) { out.push("</ol>"); inOl = false; }
+      if (!inUl) { out.push("<ul>"); inUl = true; }
+      out.push(`<li>${inline(line.slice(2))}</li>`);
+      continue;
+    }
+
+    // Ordered list
+    const olMatch = line.match(/^(\d+)\. (.+)$/);
+    if (olMatch) {
+      if (inUl) { out.push("</ul>"); inUl = false; }
+      if (!inOl) { out.push("<ol>"); inOl = true; }
+      out.push(`<li>${inline(olMatch[2])}</li>`);
+      continue;
+    }
+
+    // Horizontal rule
+    if (/^---+$/.test(line.trim())) { closeList(); out.push("<hr />"); continue; }
+
+    // Blank line
+    if (line.trim() === "") { closeList(); continue; }
+
+    // Regular paragraph line
+    closeList();
+    out.push(`<p>${inline(line)}</p>`);
+  }
+
+  closeList();
+  return out.join("\n");
 }
 
 // ─── Phase timeline ──────────────────────────────────────────
@@ -772,10 +817,15 @@ export default function SessionPage() {
       return { iteration: it.iterationNumber, phase: it.type, phaseLabel: it.type, responses, summary: it.summary ?? "", consensus: it.consensus ?? 0 };
     });
 
-  const isRunning = session?.status === "running";
+  const isRunning   = session?.status === "running";
   const isCompleted = session?.status === "completed";
-  const isError = session?.status === "error";
-  const isQuick = !!(session?.quickAnswer && storedIters.length === 0);
+  const isError     = session?.status === "error";
+  // hasQuickAnswer: a quick answer exists (always shown first)
+  const hasQuickAnswer = !!session?.quickAnswer;
+  // hasDebate: a full debate has run (iterations exist)
+  const hasDebate = storedIters.length > 0;
+  // isQuick (legacy compat): only a quick answer, no debate run yet
+  const isQuick = hasQuickAnswer && !hasDebate;
   const isPinned = !!(session as any)?.isPinned;
   const progress = session && session.totalIterations > 0
     ? Math.round((session.currentIteration / session.totalIterations) * 100) : 0;
@@ -955,8 +1005,40 @@ export default function SessionPage() {
             </div>
           )}
 
-          {/* Debate history */}
-          {isCompleted && !isQuick && allIters.length > 0 && (
+          {/* ─── COMPLETED STATE — chronological order ───
+              1. Quick answer (always first if it exists)
+              2. Debate starter (if no debate yet and no follow-ups)
+              3. Debate history (collapsed rounds)
+              4. Debate consensus answer
+              5. Follow-ups (each with their own debate starter)
+              6. Follow-up input
+          ──────────────────────────────── */}
+
+          {/* 1. Quick answer — shown for completed sessions (and while debate is running on top of it) */}
+          {hasQuickAnswer && (isCompleted || isRunning) && (
+            <div className="border border-border rounded-xl overflow-hidden animate-fade-in-up">
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/20">
+                <Zap className="w-3.5 h-3.5 text-amber-500" />
+                <span className="text-xs font-semibold text-foreground">Initial answer</span>
+                {hasDebate && <span className="text-xs text-muted-foreground ml-1">— full expert debate below</span>}
+              </div>
+              <div className="px-4 py-4">
+                <div className="mercury-prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(session.quickAnswer ?? "") }} />
+              </div>
+            </div>
+          )}
+
+          {/* 2. Debate starter — only when no debate has run yet and no follow-ups */}
+          {isCompleted && isQuick && followUps.length === 0 && !showWizard && (
+            <DebateStarter
+              query={session.query}
+              onLaunchDebate={cfg => debateMutation.mutate(cfg)}
+              onCustomSetup={() => { setWizardQuery(null); setShowWizard(true); }}
+            />
+          )}
+
+          {/* 3. Debate history (collapsed rounds) */}
+          {isCompleted && hasDebate && allIters.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-foreground">Debate history</h3>
@@ -966,17 +1048,12 @@ export default function SessionPage() {
             </div>
           )}
 
-          {/* Results */}
-          {isCompleted && <Results session={session} iterations={storedIters} isQuick={isQuick} />}
-
-          {/* ── Debate starter — shown after quick answer when no follow-ups have been added yet ── */}
-          {isCompleted && isQuick && storedIters.length === 0 && followUps.length === 0 && !showWizard && (
-            <DebateStarter
-              query={session.query}
-              onLaunchDebate={cfg => debateMutation.mutate(cfg)}
-              onCustomSetup={() => { setWizardQuery(null); setShowWizard(true); }}
-            />
+          {/* 4. Debate consensus answer */}
+          {isCompleted && hasDebate && (
+            <Results session={session} iterations={storedIters} isQuick={false} />
           )}
+
+          {/* Debate starter after debate results — allow running more debates or follow-ups */}
 
           {/* ── Follow-up thread ── */}
           {followUps.map((fu, i) => (
