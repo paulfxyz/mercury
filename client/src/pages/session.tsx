@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -994,6 +994,24 @@ export default function SessionPage() {
   let debates: DebateEntry[] = [];
   try { debates = JSON.parse((session as any)?.debates ?? "[]"); } catch {}
 
+  // Build a merged timeline so follow-ups and their debates interleave correctly.
+  // "Initial" debates = those created before the first follow-up (or all if no follow-ups).
+  // Each follow-up is followed immediately by any debate whose createdAt > follow-up.createdAt
+  // and < next follow-up's createdAt (if any).
+  const firstFollowUpTs = followUps[0]?.createdAt ?? Infinity;
+  const initialDebates = debates.filter(d => d.createdAt < firstFollowUpTs);
+  type TimelineItem =
+    | { kind: "debate"; entry: DebateEntry; globalIdx: number }
+    | { kind: "followup"; entry: FollowUpEntry; fuIdx: number; relatedDebates: DebateEntry[] };
+  const timeline: TimelineItem[] = [
+    ...initialDebates.map((d): TimelineItem => ({ kind: "debate", entry: d, globalIdx: debates.indexOf(d) })),
+    ...followUps.map((fu, i): TimelineItem => {
+      const nextFuTs = followUps[i + 1]?.createdAt ?? Infinity;
+      const related = debates.filter(d => d.createdAt > fu.createdAt && d.createdAt < nextFuTs);
+      return { kind: "followup", entry: fu, fuIdx: i, relatedDebates: related };
+    }),
+  ];
+
   // Poll the last child debate to know if it's still running
   // (debates are sequential, so only the last one can be running)
   const lastDebateId = debates[debates.length - 1]?.sessionId ?? null;
@@ -1207,7 +1225,7 @@ export default function SessionPage() {
             </div>
           )}
 
-          {/* 2. Debate starter — only when no debates launched yet and no follow-ups */}
+          {/* 2. Initial debate starter — only when nothing has been launched yet */}
           {isCompleted && debates.length === 0 && followUps.length === 0 && !showWizard && !isAnyDebateRunning && (
             <DebateStarter
               query={session.query}
@@ -1216,33 +1234,51 @@ export default function SessionPage() {
             />
           )}
 
-          {/* 3+4. Child debate blocks — each self-contained, append-only */}
-          {debates.map((d, i) => (
-            <DebateBlock key={d.sessionId} entry={d} idx={i} />
-          ))}
+          {/* 3. Merged timeline: initial debates, then each follow-up with its own debates after it */}
+          {timeline.map((item) => {
+            if (item.kind === "debate") {
+              return <DebateBlock key={item.entry.sessionId} entry={item.entry} idx={item.globalIdx} />;
+            }
+            // follow-up item
+            const { entry: fu, fuIdx, relatedDebates } = item;
+            const isLastFu = fuIdx === followUps.length - 1;
+            // The last item in this follow-up's related debates may still be running
+            const lastRelatedDebate = relatedDebates[relatedDebates.length - 1];
+            const debateRunningHere = isAnyDebateRunning && !!lastRelatedDebate &&
+              lastRelatedDebate.sessionId === lastDebateId;
+            // Show the running indicator after initial debates (not under a follow-up) only when
+            // the running debate belongs to initial debates
+            return (
+              <Fragment key={fu.createdAt}>
+                <FollowUpEntryCard
+                  entry={fu}
+                  idx={fuIdx}
+                  isLast={isLastFu && !pendingFollowUp && isCompleted}
+                  debateLocked={isAnyDebateRunning}
+                  onLaunchDebate={cfg => debateMutation.mutate(cfg)}
+                  onCustomSetup={q => { setWizardQuery(q); setShowWizard(true); }}
+                />
+                {relatedDebates.map((d) => (
+                  <DebateBlock key={d.sessionId} entry={d} idx={debates.indexOf(d)} />
+                ))}
+                {debateRunningHere && (
+                  <div className="flex items-center gap-2.5 px-1 py-1 text-xs text-muted-foreground animate-fade-in-up">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+                    Debate in progress — next debate available once this one completes.
+                  </div>
+                )}
+              </Fragment>
+            );
+          })}
 
-          {/* No standalone debate starter after a debate — only FollowUpEntryCard shows one after a follow-up answer */}
-
-          {/* Running indicator — shown instead of debate starter while a debate is in progress */}
-          {isAnyDebateRunning && debates.length > 0 && (
+          {/* Running indicator for initial debates (before any follow-up) */}
+          {isAnyDebateRunning && initialDebates.length > 0 &&
+            lastDebateId === initialDebates[initialDebates.length - 1]?.sessionId && (
             <div className="flex items-center gap-2.5 px-1 py-1 text-xs text-muted-foreground animate-fade-in-up">
               <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
               Debate in progress — next debate available once this one completes.
             </div>
           )}
-
-          {/* ── Follow-up thread ── */}
-          {followUps.map((fu, i) => (
-            <FollowUpEntryCard
-              key={fu.createdAt}
-              entry={fu}
-              idx={i}
-              isLast={i === followUps.length - 1 && !pendingFollowUp && isCompleted}
-              debateLocked={isAnyDebateRunning}
-              onLaunchDebate={cfg => debateMutation.mutate(cfg)}
-              onCustomSetup={q => { setWizardQuery(q); setShowWizard(true); }}
-            />
-          ))}
 
           {/* Pending follow-up (generating) */}
           {pendingFollowUp && (

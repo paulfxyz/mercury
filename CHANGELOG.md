@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.7.8] — 2026-03-30
+
+### Fixed
+- **Chronological timeline for follow-up debates** — debates triggered from a follow-up now render immediately after their follow-up answer, not above it. The session now builds a merged timeline: initial answer → initial debate(s) → follow-up 1 → follow-up 1's debate(s) → follow-up 2 → …, preserving correct reading order at all times.
+- Running indicator for in-progress debates is now anchored to the correct position in the timeline (next to the debate that is running), whether it belongs to the initial inquiry or a follow-up.
+
+---
+
 ## [3.7.7] — 2026-03-30
 
 ### Fixed
