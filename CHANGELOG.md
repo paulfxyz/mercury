@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.7.6] — 2026-03-30
+
+### Fixed
+- **One debate at a time** — a new debate cannot be launched while one is already running. Enforced at two levels:
+  - **Server:** `POST /api/sessions/:id/debate` checks all existing child sessions for `status === "running"` and returns `409` if any is found.
+  - **Client:** `isAnyDebateRunning` polls the last child session. The `DebateStarter` is hidden and replaced by a "Debate in progress — available once it completes" indicator until the running debate finishes.
+- Applies everywhere a debate can be launched: initial debate starter, post-debate starter, and follow-up debate starters.
+
+---
+
 ## [3.7.5] — 2026-03-30
 
 ### Fixed

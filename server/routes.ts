@@ -251,6 +251,16 @@ export function registerRoutes(httpServer: Server, app: Express) {
 
     const debateQuery = queryOverride?.trim() || parent.query;
 
+    // Guard: only one debate at a time — check if any existing child is still running
+    let existingDebates: Array<{ sessionId: string }> = [];
+    try { existingDebates = JSON.parse((parent as any).debates ?? "[]"); } catch {}
+    for (const d of existingDebates) {
+      const child = storage.getSession(d.sessionId);
+      if (child?.status === "running") {
+        return res.status(409).json({ error: "A debate is already running. Please wait for it to complete before launching another." });
+      }
+    }
+
     // Create a child session for this debate — parentId marks it as hidden from sidebar
     const child = storage.createSession({
       title: parent.title,

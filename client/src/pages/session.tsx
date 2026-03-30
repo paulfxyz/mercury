@@ -728,12 +728,13 @@ function DebateBlock({ entry, idx }: { entry: DebateEntry; idx: number }) {
   );
 }
 
-function FollowUpEntryCard({ entry, idx, onLaunchDebate, onCustomSetup, isLast }: {
+function FollowUpEntryCard({ entry, idx, onLaunchDebate, onCustomSetup, isLast, debateLocked }: {
   entry: FollowUpEntry;
   idx: number;
   onLaunchDebate: (cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string; queryOverride?: string }) => void;
   onCustomSetup: (query: string) => void;
   isLast: boolean;
+  debateLocked: boolean;
 }) {
   return (
     <div className="space-y-3 animate-fade-in-up">
@@ -758,13 +759,19 @@ function FollowUpEntryCard({ entry, idx, onLaunchDebate, onCustomSetup, isLast }
           <div className="mercury-prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(entry.answer) }} />
         </div>
       </div>
-      {/* Debate starter for this follow-up — always shown so user can escalate */}
-      {isLast && (
+      {/* Debate starter for this follow-up — shown when last and no debate running */}
+      {isLast && !debateLocked && (
         <DebateStarter
           query={entry.query}
           onLaunchDebate={cfg => onLaunchDebate({ ...cfg, queryOverride: entry.query })}
           onCustomSetup={() => onCustomSetup(entry.query)}
         />
+      )}
+      {isLast && debateLocked && (
+        <div className="flex items-center gap-2.5 px-1 py-1 text-xs text-muted-foreground">
+          <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+          Debate in progress — available once it completes.
+        </div>
       )}
     </div>
   );
@@ -981,11 +988,23 @@ export default function SessionPage() {
   const progress = session && session.totalIterations > 0
     ? Math.round((session.currentIteration / session.totalIterations) * 100) : 0;
 
-  // Parse follow-ups from session
+  // Parse follow-ups and debates from session
   let followUps: FollowUpEntry[] = [];
   try { followUps = JSON.parse((session as any)?.followUps ?? "[]"); } catch {}
   let debates: DebateEntry[] = [];
   try { debates = JSON.parse((session as any)?.debates ?? "[]"); } catch {}
+
+  // Poll the last child debate to know if it's still running
+  // (debates are sequential, so only the last one can be running)
+  const lastDebateId = debates[debates.length - 1]?.sessionId ?? null;
+  const { data: lastDebateSession } = useQuery<Session>({
+    queryKey: ["/api/sessions", lastDebateId],
+    enabled: !!lastDebateId,
+    refetchInterval: (q) => (q.state.data as Session | undefined)?.status === "running" ? 2000 : false,
+  });
+  // Lock the UI while any debate is pending or the last child is still running
+  const isAnyDebateRunning = debateMutation.isPending ||
+    (!!lastDebateId && (!lastDebateSession || lastDebateSession.status === "running"));
 
   if (isLoading) return (
     <Layout><div className="h-full flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div></Layout>
@@ -1189,7 +1208,7 @@ export default function SessionPage() {
           )}
 
           {/* 2. Debate starter — only when no debates launched yet and no follow-ups */}
-          {isCompleted && debates.length === 0 && followUps.length === 0 && !showWizard && !debateMutation.isPending && (
+          {isCompleted && debates.length === 0 && followUps.length === 0 && !showWizard && !isAnyDebateRunning && (
             <DebateStarter
               query={session.query}
               onLaunchDebate={cfg => debateMutation.mutate(cfg)}
@@ -1203,7 +1222,7 @@ export default function SessionPage() {
           ))}
 
           {/* Debate starter after last block — always available to run another debate */}
-          {isCompleted && (debates.length > 0 || followUps.length > 0) && !showWizard && !debateMutation.isPending && (
+          {isCompleted && (debates.length > 0 || followUps.length > 0) && !showWizard && !isAnyDebateRunning && (
             <DebateStarter
               query={session.query}
               onLaunchDebate={cfg => debateMutation.mutate(cfg)}
@@ -1211,11 +1230,11 @@ export default function SessionPage() {
             />
           )}
 
-          {/* Launching indicator */}
-          {debateMutation.isPending && (
-            <div className="border border-border rounded-xl p-4 flex items-center gap-3 animate-fade-in-up">
-              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground flex-shrink-0" />
-              <p className="text-sm text-muted-foreground">Starting expert debate…</p>
+          {/* Running indicator — shown instead of debate starter while a debate is in progress */}
+          {isAnyDebateRunning && debates.length > 0 && (
+            <div className="flex items-center gap-2.5 px-1 py-1 text-xs text-muted-foreground animate-fade-in-up">
+              <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+              Debate in progress — next debate available once this one completes.
             </div>
           )}
 
@@ -1226,6 +1245,7 @@ export default function SessionPage() {
               entry={fu}
               idx={i}
               isLast={i === followUps.length - 1 && !pendingFollowUp && isCompleted}
+              debateLocked={isAnyDebateRunning}
               onLaunchDebate={cfg => debateMutation.mutate(cfg)}
               onCustomSetup={q => { setWizardQuery(q); setShowWizard(true); }}
             />
