@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.7.7] — 2026-03-30
+
+### Fixed
+- **Follow-up locked while debate is running** — the follow-up input bar is now hidden and replaced by a "Follow-up available once the debate completes" indicator whenever a debate is in progress. This prevents users from submitting follow-ups mid-debate and keeps the session in a clean, ordered state.
+- **No standalone debate starter after a debate answer** — a new debate can only be launched after a follow-up has been added to the session. The floating `DebateStarter` that previously appeared after every completed debate block has been removed. The `DebateStarter` still appears inside each `FollowUpEntryCard` (the last one, when no debate is running), preserving the intended UX without allowing debate chaining on debate answers.
+
+---
+
 ## [3.7.6] — 2026-03-30
 
 ### Fixed

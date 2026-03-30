@@ -1221,14 +1221,7 @@ export default function SessionPage() {
             <DebateBlock key={d.sessionId} entry={d} idx={i} />
           ))}
 
-          {/* Debate starter after last block — always available to run another debate */}
-          {isCompleted && (debates.length > 0 || followUps.length > 0) && !showWizard && !isAnyDebateRunning && (
-            <DebateStarter
-              query={session.query}
-              onLaunchDebate={cfg => debateMutation.mutate(cfg)}
-              onCustomSetup={() => { setWizardQuery(null); setShowWizard(true); }}
-            />
-          )}
+          {/* No standalone debate starter after a debate — only FollowUpEntryCard shows one after a follow-up answer */}
 
           {/* Running indicator — shown instead of debate starter while a debate is in progress */}
           {isAnyDebateRunning && debates.length > 0 && (
@@ -1270,12 +1263,18 @@ export default function SessionPage() {
             </div>
           )}
 
-          {/* Follow-up input — shown on completed sessions */}
-          {isCompleted && !pendingFollowUp && (
+          {/* Follow-up input — hidden while a debate is running or a follow-up is in flight */}
+          {isCompleted && !pendingFollowUp && !isAnyDebateRunning && (
             <FollowUpBar
               onSubmit={(q) => followUpMutation.mutate(q)}
               isPending={followUpMutation.isPending}
             />
+          )}
+          {isCompleted && !pendingFollowUp && isAnyDebateRunning && (
+            <div className="flex items-center gap-2.5 px-1 py-2 text-xs text-muted-foreground animate-fade-in-up">
+              <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+              Follow-up available once the debate completes.
+            </div>
           )}
 
           {/* Error */}
