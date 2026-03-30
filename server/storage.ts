@@ -72,6 +72,7 @@ for (const col of [
   "ALTER TABLE sessions ADD COLUMN quick_answer TEXT;",
   "ALTER TABLE sessions ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0;",
   "ALTER TABLE sessions ADD COLUMN follow_ups TEXT NOT NULL DEFAULT '[]';",
+  "ALTER TABLE sessions ADD COLUMN debates TEXT NOT NULL DEFAULT '[]';",
   "ALTER TABLE workflows ADD COLUMN temperature REAL NOT NULL DEFAULT 0.7;",
   "ALTER TABLE workflows ADD COLUMN consensus_threshold REAL NOT NULL DEFAULT 0.7;",
 ]) {
@@ -89,6 +90,7 @@ export interface IStorage {
   updateSessionTitle(id: string, title: string): Session | undefined;
   setPinned(id: string, pinned: boolean): Session | undefined;
   appendFollowUp(id: string, query: string, answer: string): Session | undefined;
+  appendDebate(id: string, childSessionId: string, query: string): Session | undefined;
 
   createIteration(data: InsertIteration): Iteration;
   getIterationsBySession(sessionId: string): Iteration[];
@@ -223,6 +225,15 @@ export const storage: IStorage = {
         db.delete(settings).where(eq(settings.key, "openrouter_api_key")).run();
       }
     }
+  },
+  appendDebate(id, childSessionId, query) {
+    const session = db.select().from(sessions).where(eq(sessions.id, id)).get();
+    if (!session) return undefined;
+    let debates: Array<{ sessionId: string; query: string; createdAt: number }> = [];
+    try { debates = JSON.parse((session as any).debates ?? "[]"); } catch {}
+    debates.push({ sessionId: childSessionId, query, createdAt: Date.now() });
+    db.update(sessions).set({ debates: JSON.stringify(debates) } as any).where(eq(sessions.id, id)).run();
+    return db.select().from(sessions).where(eq(sessions.id, id)).get();
   },
   getPrimaryApiKey() {
     return db.select().from(apiKeys).where(eq(apiKeys.isPrimary, 1)).get();

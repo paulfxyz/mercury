@@ -29,6 +29,7 @@ interface LiveIteration {
   consensus: number;
 }
 interface FollowUpEntry { query: string; answer: string; createdAt: number; }
+interface DebateEntry { sessionId: string; query: string; createdAt: number; }
 interface ModelOption { id: string; name: string; }
 interface WizardStep { modelId: string; label: string; systemPrompt: string; }
 function parseWizardSteps(raw: string): WizardStep[] { try { return JSON.parse(raw); } catch { return []; } }
@@ -581,6 +582,152 @@ function Results({ session, iterations, isQuick }: { session: Session; iteration
 }
 
 // ─── Follow-up entry (answered inline) ───────────────────────
+
+// ─── Debate block — self-contained child debate render ────────
+// Fetches and streams a child debate session inline in the parent page.
+function DebateBlock({ entry, idx }: { entry: DebateEntry; idx: number }) {
+  const [liveIters, setLiveIters] = useState<LiveIteration[]>([]);
+  const [currentPhase, setCurrentPhase] = useState("research");
+  const [showLive, setShowLive] = useState(true);
+  const wsRef = useRef<WebSocket | null>(null);
+  const { toast } = useToast();
+
+  const { data: child } = useQuery<Session>({
+    queryKey: ["/api/sessions", entry.sessionId],
+    refetchInterval: (q) => (q.state.data as Session | undefined)?.status === "running" ? 2000 : false,
+  });
+  const { data: childIters = [] } = useQuery<Iteration[]>({
+    queryKey: ["/api/sessions", entry.sessionId, "iterations"],
+    refetchInterval: () => child?.status === "running" ? 3000 : false,
+  });
+
+  useEffect(() => {
+    const base = new URL("./ws", location.href);
+    base.protocol = base.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${base.href}?sessionId=${entry.sessionId}`);
+    wsRef.current = ws;
+    ws.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.type === "iteration_start") setCurrentPhase(d.phase ?? "research");
+        if (d.type === "iteration_complete") {
+          setLiveIters(prev => {
+            if (prev.find(i => i.iteration === d.iteration)) return prev;
+            return [...prev, { iteration: d.iteration, phase: d.phase ?? "research", phaseLabel: d.phaseLabel ?? d.phase ?? "Research", responses: d.responses ?? [], summary: d.summary ?? "", consensus: d.consensus ?? 0 }];
+          });
+          queryClient.invalidateQueries({ queryKey: ["/api/sessions", entry.sessionId] });
+        }
+        if (d.type === "completed") {
+          queryClient.invalidateQueries({ queryKey: ["/api/sessions", entry.sessionId] });
+          queryClient.invalidateQueries({ queryKey: ["/api/sessions", entry.sessionId, "iterations"] });
+        }
+        if (d.type === "error") toast({ title: "Debate failed.", description: d.message, variant: "destructive" });
+      } catch {}
+    };
+    return () => ws.close();
+  }, [entry.sessionId]);
+
+  const isRunning   = !child || child.status === "running";
+  const isCompleted = child?.status === "completed";
+  const isError     = child?.status === "error";
+  const progress    = child && child.totalIterations > 0
+    ? Math.round((child.currentIteration / child.totalIterations) * 100) : 0;
+
+  const allIters: LiveIteration[] = liveIters.length > 0
+    ? liveIters
+    : childIters.map(it => {
+      let responses: LiveResponse[] = [];
+      try { responses = JSON.parse(it.content) ?? []; } catch {}
+      return { iteration: it.iterationNumber, phase: it.type, phaseLabel: it.type, responses, summary: it.summary ?? "", consensus: it.consensus ?? 0 };
+    });
+
+  return (
+    <div className="space-y-3 animate-fade-in-up">
+      {/* Thread connector */}
+      <div className="flex items-center gap-2 pl-1">
+        <div className="w-px h-6 bg-border ml-3" />
+        <GitBranch className="w-3.5 h-3.5 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground font-medium">Expert debate {idx + 1}</span>
+        {entry.query !== "" && <span className="text-xs text-muted-foreground truncate max-w-[200px]">— {entry.query.slice(0, 60)}{entry.query.length > 60 ? "…" : ""}</span>}
+      </div>
+
+      {/* Running state */}
+      {isRunning && child && (
+        <div className="border border-border rounded-xl p-4 space-y-4 bg-card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Round {child.currentIteration} of {child.totalIterations}</p>
+              <p className="text-xs text-muted-foreground capitalize">{currentPhase} phase</p>
+            </div>
+            <span className="text-2xl font-bold text-foreground tabular-nums">{progress}%</span>
+          </div>
+          <Progress value={progress} className="h-1.5" />
+          <PhaseTimeline currentPhase={currentPhase} />
+          <button onClick={() => setShowLive(!showLive)}
+            className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors pt-1 border-t border-border">
+            {showLive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            {showLive ? "Hide" : "Show"} live progress
+            {showLive ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+        </div>
+      )}
+
+      {/* Launching state (child session not yet fetched) */}
+      {isRunning && !child && (
+        <div className="border border-border rounded-xl p-4 flex items-center gap-3 bg-card">
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground flex-shrink-0" />
+          <p className="text-sm text-muted-foreground">Starting expert debate…</p>
+        </div>
+      )}
+
+      {/* Live panel */}
+      {isRunning && child && showLive && (
+        <div className="border border-border rounded-xl overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-xs font-semibold text-foreground">Live — Expert debate in progress</span>
+            {liveIters.length > 0 && <Badge variant="outline" className="text-xs py-0 ml-auto">{liveIters.length} round{liveIters.length !== 1 ? "s" : ""}</Badge>}
+          </div>
+          {liveIters.length === 0 ? (
+            <div className="px-4 py-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <Loader2 className="w-4 h-4 animate-spin text-amber-500 flex-shrink-0" />
+                <p className="text-sm text-muted-foreground">Calling your expert team — first responses arriving shortly…</p>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4"><LivePanel iters={liveIters} /></div>
+          )}
+        </div>
+      )}
+
+      {/* Completed: history + results */}
+      {isCompleted && child && (
+        <>
+          {allIters.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">Debate history</h3>
+                <span className="text-xs text-muted-foreground">{allIters.length} rounds</span>
+              </div>
+              {allIters.map((it, i) => <IterCard key={it.iteration} iter={it} idx={i} />)}
+            </div>
+          )}
+          <Results session={child} iterations={childIters} isQuick={false} />
+        </>
+      )}
+
+      {/* Error */}
+      {isError && (
+        <div className="border border-destructive/30 bg-destructive/5 rounded-xl p-4 flex items-center gap-3">
+          <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0" />
+          <p className="text-sm text-foreground">Debate failed. Check your API key and try again.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FollowUpEntryCard({ entry, idx, onLaunchDebate, onCustomSetup, isLast }: {
   entry: FollowUpEntry;
   idx: number;
@@ -714,8 +861,7 @@ export default function SessionPage() {
     refetchInterval: () => session?.status === "running" ? 3000 : false,
   });
 
-  // Launch a full debate ON this same session — no navigation, no new session
-  // Accepts an optional queryOverride so follow-up questions can be debated
+  // Launch a child debate session — parent never mutated, new block appends below
   const debateMutation = useMutation({
     mutationFn: async (cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string; queryOverride?: string }) => {
       const { queryOverride, ...rest } = cfg;
@@ -723,12 +869,13 @@ export default function SessionPage() {
         ...rest,
         ...(queryOverride ? { query: queryOverride } : {}),
       });
-      return res.json() as Promise<{ sessionId: string }>;
+      return res.json() as Promise<{ sessionId: string; childSessionId: string }>;
     },
     onSuccess: () => {
+      // Refresh parent so the new debates[] entry appears
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
       setShowWizard(false);
-      setShowLive(true);
     },
     onError: () => toast({ title: "Could not launch the debate.", variant: "destructive" }),
   });
@@ -796,7 +943,11 @@ export default function SessionPage() {
         if (d.type === "followup_complete") {
           setPendingFollowUp(null);
           queryClient.invalidateQueries({ queryKey: ["/api/sessions", id] });
-          // Scroll to the new follow-up
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 200);
+        }
+        if (d.type === "debate_started") {
+          // Parent has a new debates[] entry — refresh so DebateBlock appears
+          queryClient.invalidateQueries({ queryKey: ["/api/sessions", id] });
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 200);
         }
         if (d.type === "followup_error") {
@@ -833,6 +984,8 @@ export default function SessionPage() {
   // Parse follow-ups from session
   let followUps: FollowUpEntry[] = [];
   try { followUps = JSON.parse((session as any)?.followUps ?? "[]"); } catch {}
+  let debates: DebateEntry[] = [];
+  try { debates = JSON.parse((session as any)?.debates ?? "[]"); } catch {}
 
   if (isLoading) return (
     <Layout><div className="h-full flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div></Layout>
@@ -1028,8 +1181,8 @@ export default function SessionPage() {
             </div>
           )}
 
-          {/* 2. Debate starter — only when no debate has run yet and no follow-ups */}
-          {isCompleted && isQuick && followUps.length === 0 && !showWizard && (
+          {/* 2. Debate starter — only when no debates launched yet and no follow-ups */}
+          {isCompleted && debates.length === 0 && followUps.length === 0 && !showWizard && !debateMutation.isPending && (
             <DebateStarter
               query={session.query}
               onLaunchDebate={cfg => debateMutation.mutate(cfg)}
@@ -1037,23 +1190,27 @@ export default function SessionPage() {
             />
           )}
 
-          {/* 3. Debate history (collapsed rounds) */}
-          {isCompleted && hasDebate && allIters.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground">Debate history</h3>
-                <span className="text-xs text-muted-foreground">{allIters.length} rounds</span>
-              </div>
-              {allIters.map((it, i) => <IterCard key={it.iteration} iter={it} idx={i} />)}
+          {/* 3+4. Child debate blocks — each self-contained, append-only */}
+          {debates.map((d, i) => (
+            <DebateBlock key={d.sessionId} entry={d} idx={i} />
+          ))}
+
+          {/* Debate starter after last block — always available to run another debate */}
+          {isCompleted && (debates.length > 0 || followUps.length > 0) && !showWizard && !debateMutation.isPending && (
+            <DebateStarter
+              query={session.query}
+              onLaunchDebate={cfg => debateMutation.mutate(cfg)}
+              onCustomSetup={() => { setWizardQuery(null); setShowWizard(true); }}
+            />
+          )}
+
+          {/* Launching indicator */}
+          {debateMutation.isPending && (
+            <div className="border border-border rounded-xl p-4 flex items-center gap-3 animate-fade-in-up">
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground flex-shrink-0" />
+              <p className="text-sm text-muted-foreground">Starting expert debate…</p>
             </div>
           )}
-
-          {/* 4. Debate consensus answer */}
-          {isCompleted && hasDebate && (
-            <Results session={session} iterations={storedIters} isQuick={false} />
-          )}
-
-          {/* Debate starter after debate results — allow running more debates or follow-ups */}
 
           {/* ── Follow-up thread ── */}
           {followUps.map((fu, i) => (

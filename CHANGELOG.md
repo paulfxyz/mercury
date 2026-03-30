@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.7.4] — 2026-03-30
+
+### Fixed
+- **Debates are now append-only child sessions** — launching a debate no longer mutates the parent session or wipes any existing content. Each debate creates its own independent child session, which renders as a self-contained animated block appended below all previous content.
+- `POST /api/sessions/:id/debate` now creates a child `Session` row, appends its ID to the parent's `debates` JSON column, and broadcasts `debate_started` to the parent's WebSocket channel. The parent session status is never changed.
+- `DebateBlock` component in `session.tsx`: self-contained, opens its own WebSocket to the child session, renders live progress (phase timeline, round counter, model responses streaming), and shows history + consensus answer once complete.
+- The full session thread is now strictly append-only: quick answer → debate blocks (each running and completing in sequence) → follow-ups. Nothing is ever overwritten or scrolled away.
+- After each debate block completes, a new `DebateStarter` appears so another debate or workflow can be launched immediately.
+
+---
+
 ## [3.7.3] — 2026-03-30
 
 ### Fixed

@@ -17,6 +17,7 @@ export const sessions = sqliteTable("sessions", {
   workflowId: text("workflow_id"),
   isPinned: integer("is_pinned").notNull().default(0),
   followUps: text("follow_ups").notNull().default("[]"), // JSON: [{query, answer, createdAt}]
+  debates: text("debates").notNull().default("[]"),     // JSON: [{sessionId, query, createdAt}]
   createdAt: integer("created_at").notNull(),
 });
 export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true, createdAt: true });

@@ -238,41 +238,51 @@ export function registerRoutes(httpServer: Server, app: Express) {
     res.json(s);
   });
 
-  // Launch a full debate ON the existing session (no new session created)
+  // Launch a debate as a CHILD session — parent is never mutated, content appends below
   app.post("/api/sessions/:id/debate", async (req, res) => {
     const { selectedModels, iterations: iterCount = 15, temperature = 0.7, consensusThreshold = 0.7, workflowId, query: queryOverride } = req.body;
     if (!selectedModels?.length) return res.status(400).json({ error: "selectedModels required" });
 
-    const session = storage.getSession(req.params.id);
-    if (!session) return res.status(404).json({ error: "Session not found" });
+    const parent = storage.getSession(req.params.id);
+    if (!parent) return res.status(404).json({ error: "Session not found" });
 
     const apiKey = resolveApiKey(req);
     if (!apiKey) return res.status(401).json({ error: "API key not configured" });
 
-    // Use follow-up query if provided, otherwise use original session query
-    const debateQuery = queryOverride?.trim() || session.query;
+    const debateQuery = queryOverride?.trim() || parent.query;
 
-    // Reset the existing session for a full debate run
-    storage.updateSession(req.params.id, {
+    // Create a new child session for this debate run
+    const child = storage.createSession({
+      title: parent.title,
+      query: debateQuery,
+      files: "[]",
+      selectedModels: JSON.stringify(selectedModels),
       status: "running",
       currentIteration: 0,
       totalIterations: iterCount,
       finalAnswer: null,
+      quickAnswer: null,
       workflowId: workflowId ?? null,
     });
 
-    res.json({ sessionId: req.params.id });
+    // Register child debate on parent (parent never changes status)
+    storage.appendDebate(req.params.id, child.id, debateQuery);
+
+    // Broadcast to parent WebSocket so the page knows a new debate block appeared
+    broadcast(req.params.id, { type: "debate_started", childSessionId: child.id, query: debateQuery });
+
+    res.json({ sessionId: req.params.id, childSessionId: child.id });
 
     setImmediate(async () => {
       try {
         await runOrchestration(
-          req.params.id, debateQuery, selectedModels, iterCount, apiKey,
-          (update) => broadcast(req.params.id, update),
+          child.id, debateQuery, selectedModels, iterCount, apiKey,
+          (update) => broadcast(child.id, update),
           temperature, consensusThreshold
         );
       } catch (e) {
-        storage.updateSession(req.params.id, { status: "error" });
-        broadcast(req.params.id, { type: "error", message: String(e) });
+        storage.updateSession(child.id, { status: "error" });
+        broadcast(child.id, { type: "error", message: String(e) });
       }
     });
   });
