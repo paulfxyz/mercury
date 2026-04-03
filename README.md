@@ -57,6 +57,7 @@
 13. [Model recommendations](#-model-recommendations)
 14. [Changelog](#-changelog)
 15. [Author](#-author)
+16. [A note on vibe coding](#-a-note-on-vibe-coding)
 
 ---
 
@@ -725,6 +726,20 @@ Current: **v3.7.8** — append-only debate child sessions, merged chronological 
 - [Openline](https://openline.com) — instant eSIMs in 190+ countries
 
 Other projects: [mang.sh](https://mang.sh) · [ase.so](https://ase.so)
+
+---
+
+## 🤙 A note on vibe coding
+
+This project is 100% vibe coding.
+
+I am not a software engineer, a professional developer, or a computer scientist. I don't pretend to be. I'm a former hacker turned entrepreneur — someone who has always had a healthy obsession with technology and a very good working relationship with AI tools like [Claude](https://claude.ai) and [Perplexity Computer](https://computer.perplexity.ai).
+
+Every line of code in Mercury was written in collaboration with AI. The architecture decisions, the bug fixes, the TypeScript types, the SQL schema, the Dockerfile — all of it emerged from a conversation, not a career. The technical depth in this README reflects what I've learned *during* the build, not what I knew going in.
+
+If something in here looks well-engineered, credit the tools. If something looks opinionated or unconventional, that's probably me.
+
+Vibe coding doesn't mean low quality. It means the barrier between an idea and a working product is now a conversation. I think that's worth celebrating.
 
 ---
 
