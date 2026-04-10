@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.7.9] — 2026-04-10
+
+### Added
+- **Full app i18n — 15 languages** — every visible string in the Mercury web app is now translated: onboarding, settings, chat page, session page, live progress panel, wizard steps, error messages, toast notifications, sidebar, workflows page, and the 404 page. Supported languages: English, French, Spanish, German, Italian, Portuguese, Arabic (RTL), Hebrew (RTL), Chinese, Japanese, Danish, Dutch, Hindi, Russian, Korean.
+- **`client/src/lib/i18n.ts`** — 2,910-key translation file (194 keys × 15 languages) with a React `I18nProvider`, `useI18n()` hook, `localStorage` persistence, and automatic browser-language detection on first visit.
+- **Landing page i18n audit** — the tech stack cards (Frontend / Storage / AI backbone / Transport) and the Fly.io deploy note were previously hardcoded English on all language switches; now fully translated across all 15 languages.
+
+### Changed
+- `PHASE_CFG` in `session.tsx` converted from a module-level const to a `getPhaseCfg(t)` function so phase labels (`Research`, `Debate`, `Vote`, `Synthesis`, `Final`) are translated at render time.
+- All `confirm()` dialogs now pass translated strings.
+- All `toast()` calls now use translation keys for title and description.
+
+---
+
 ## [3.7.8] — 2026-03-30
 
 ### Fixed

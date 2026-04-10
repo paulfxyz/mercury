@@ -7,7 +7,7 @@
 *Every inquiry gets an immediate answer. Then an expert panel of AI models debates, challenges, and votes until they agree.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-3.7.8-brightgreen?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-3.7.9-brightgreen?style=for-the-badge)](CHANGELOG.md)
 [![Built with TypeScript](https://img.shields.io/badge/Built%20with-TypeScript-3178c6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Powered by OpenRouter](https://img.shields.io/badge/Powered%20by-OpenRouter-6c47ff?style=for-the-badge)](https://openrouter.ai)
 [![Deploy on Fly.io](https://img.shields.io/badge/Deploy%20on-Fly.io-7c3aed?style=for-the-badge&logo=flydotio&logoColor=white)](https://fly.io)
@@ -30,7 +30,7 @@
   ║                                                          ║
   ║   Submit → Answer → Debate → Consensus → Follow up       ║
   ║                                                          ║
-  ║   v3.7.8  ·  mercury.sh  ·  github.com/paulfxyz          ║
+  ║   v3.7.9  ·  mercury.sh  ·  github.com/paulfxyz          ║
   ╚══════════════════════════════════════════════════════════╝
 ```
 
@@ -282,6 +282,38 @@ function resolveApiKey(req: Request): string | undefined {
 ```
 
 The session key is set in React state and injected by `queryClient.ts` as an `X-Api-Key` header on every request. It never touches the database or localStorage.
+
+### Internationalisation (v3.7.9+)
+
+Mercury's React app is fully internationalised. Every visible string — onboarding, settings, chat, session, live progress, wizard, sidebar, error messages, toasts, and the 404 page — is served from a single translation file.
+
+**Architecture:**
+
+```
+client/src/lib/i18n.ts
+├── TRANSLATIONS        — 194 keys × 15 languages = 2,910 strings
+├── I18nProvider        — React context provider, wraps <App />
+├── useI18n()           — hook: returns { t, lang, setLang }
+├── getStoredLang()     — reads localStorage, falls back to navigator.language
+└── setStoredLang()     — persists selection to localStorage
+```
+
+**Usage in components:**
+
+```tsx
+import { useI18n } from "@/lib/i18n";
+
+function MyComponent() {
+  const { t } = useI18n();
+  return <button>{t("btn_save_start")}</button>;
+}
+```
+
+**Languages:** English, French, Spanish, German, Italian, Portuguese, Arabic (RTL), Hebrew (RTL), Chinese, Japanese, Danish, Dutch, Hindi, Russian, Korean.
+
+RTL languages (`ar`, `he`) automatically set `document.dir = "rtl"` via the landing page's `applyLang()` function. The React app itself is LTR-only for now — the i18n system is ready for RTL CSS overrides when needed.
+
+**Adding a new language:** Add an entry to `TRANSLATIONS` in `i18n.ts` (copy the `en` block and translate all 194 values), then add the language to the `LangCode` union type and to the landing page's `LANGUAGES` array and `TRANSLATIONS` object.
 
 ### Follow-up + debate thread model (v3.7+)
 
@@ -713,7 +745,7 @@ Key insight: **diversity beats raw capability**. Three different mid-tier models
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
-Current: **v3.7.8** — append-only debate child sessions, merged chronological timeline, one-debate-at-a-time guard, follow-up lock during debates, multi-key management, session-only key, mobile layout, split-panel wizard.
+Current: **v3.7.9** — full app i18n (15 languages, 2,910 translation keys), landing page i18n audit, append-only debate child sessions, merged chronological timeline, one-debate-at-a-time guard, follow-up lock during debates, multi-key management.
 
 ---
 

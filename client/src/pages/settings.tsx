@@ -13,11 +13,13 @@ import {
   ChevronDown, ChevronUp, Unlink, KeyRound, Sparkles, Plus,
   Star, StarOff, Clock, Server, Check,
 } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 interface SavedKey { id: string; label: string; masked: string; isPrimary: number; createdAt: number; }
 
 // ─── Add Key Form ────────────────────────────────────────────
 function AddKeyForm({ onDone }: { onDone: () => void }) {
+  const { t } = useI18n();
   const { toast } = useToast();
   const [value, setValue] = useState("");
   const [label, setLabel] = useState("");
@@ -33,15 +35,15 @@ function AddKeyForm({ onDone }: { onDone: () => void }) {
       await queryClient.invalidateQueries({ queryKey: ["/api/keys"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/onboarding"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/models"] });
-      toast({ title: "API key added successfully." });
+      toast({ title: t("toast_key_added") });
       onDone();
     },
-    onError: () => toast({ title: "Could not add the key.", variant: "destructive" }),
+    onError: () => toast({ title: t("toast_key_add_error"), variant: "destructive" }),
   });
 
   return (
     <div className="space-y-3 pt-3 border-t border-border">
-      <p className="text-xs font-medium text-foreground">Add a new key</p>
+      <p className="text-xs font-medium text-foreground">{t("add_key_new")}</p>
       <Input
         type={show ? "text" : "password"}
         placeholder="sk-or-v1-…"
@@ -52,7 +54,7 @@ function AddKeyForm({ onDone }: { onDone: () => void }) {
       />
       <div className="flex gap-2">
         <Input
-          placeholder="Label (optional) — e.g. Work, Free tier…"
+          placeholder={t("label_placeholder_settings")}
           value={label}
           onChange={e => setLabel(e.target.value)}
           className="text-sm flex-1"
@@ -65,14 +67,14 @@ function AddKeyForm({ onDone }: { onDone: () => void }) {
         </button>
       </div>
       <div className="flex gap-2">
-        <Button size="sm" variant="outline" onClick={onDone} className="flex-1">Cancel</Button>
+        <Button size="sm" variant="outline" onClick={onDone} className="flex-1">{t("btn_cancel")}</Button>
         <Button
           size="sm"
           onClick={() => addMutation.mutate()}
           disabled={value.trim().length < 10 || addMutation.isPending}
           className="flex-1"
         >
-          {addMutation.isPending ? "Saving…" : "Add key"}
+          {addMutation.isPending ? t("btn_saving") : t("btn_add_key")}
         </Button>
       </div>
     </div>
@@ -80,6 +82,7 @@ function AddKeyForm({ onDone }: { onDone: () => void }) {
 }
 
 export default function SettingsPage() {
+  const { t } = useI18n();
   const { theme, set: setTheme } = useTheme();
   const { sessionKey, setKey: setSessionKey } = useSessionKey();
   const { toast } = useToast();
@@ -99,7 +102,7 @@ export default function SettingsPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/keys"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/models"] });
-      toast({ title: "Primary key updated." });
+      toast({ title: t("toast_primary_updated") });
     },
   });
 
@@ -109,16 +112,16 @@ export default function SettingsPage() {
       await queryClient.invalidateQueries({ queryKey: ["/api/keys"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/onboarding"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/models"] });
-      toast({ title: "Key removed successfully." });
+      toast({ title: t("toast_key_removed") });
     },
-    onError: () => toast({ title: "Could not remove the key.", variant: "destructive" }),
+    onError: () => toast({ title: t("toast_key_remove_error"), variant: "destructive" }),
   });
 
   const migratesMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/keys/migrate-legacy"),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/keys"] });
-      toast({ title: "Key migrated to the new key manager." });
+      toast({ title: t("toast_migrated") });
     },
   });
 
@@ -126,7 +129,7 @@ export default function SettingsPage() {
     mutationFn: () => apiRequest("DELETE", "/api/sessions"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
-      toast({ title: "All inquiry history has been deleted.", description: "Your workflows and settings are still intact." });
+      toast({ title: t("toast_history_deleted_title"), description: t("toast_history_deleted_desc") });
     },
   });
 
@@ -140,8 +143,8 @@ export default function SettingsPage() {
 
           {/* Header */}
           <div>
-            <h1 className="text-base font-semibold text-foreground">Settings</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">API keys and preferences</p>
+            <h1 className="text-base font-semibold text-foreground">{t("settings_title")}</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">{t("settings_sub")}</p>
           </div>
 
           {/* ── API Keys ─────────────────────────────────────── */}
@@ -149,14 +152,14 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-semibold text-foreground">API Keys</span>
+                <span className="text-sm font-semibold text-foreground">{t("api_keys_heading")}</span>
               </div>
               <button
                 onClick={() => setAddingKey(v => !v)}
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
-                Add key
+                {t("add_key_btn")}
               </button>
             </div>
 
@@ -167,11 +170,11 @@ export default function SettingsPage() {
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40">
                   <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">You have a legacy API key.</p>
-                    <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">Migrate it to the new key manager to label and manage it properly.</p>
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">{t("legacy_key_title")}</p>
+                    <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">{t("legacy_key_desc")}</p>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => migratesMutation.mutate()} className="flex-shrink-0 text-xs h-7">
-                    {migratesMutation.isPending ? "Migrating…" : "Migrate"}
+                    {migratesMutation.isPending ? t("btn_migrating") : t("btn_migrate")}
                   </Button>
                 </div>
               )}
@@ -183,8 +186,8 @@ export default function SettingsPage() {
                 </div>
               ) : savedKeys.length === 0 && !hasLegacyKey ? (
                 <div className="text-center py-4">
-                  <p className="text-sm text-muted-foreground">No saved keys yet.</p>
-                  <p className="text-xs text-muted-foreground mt-1">Add one below, or use a session key above.</p>
+                  <p className="text-sm text-muted-foreground">{t("no_keys")}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t("no_keys_sub")}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -198,7 +201,7 @@ export default function SettingsPage() {
                           <p className="text-sm font-medium text-foreground truncate">{k.label}</p>
                           {k.isPrimary === 1 && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-foreground text-background font-semibold">
-                              Primary
+                              {t("primary_badge")}
                             </span>
                           )}
                         </div>
@@ -209,19 +212,19 @@ export default function SettingsPage() {
                           <button
                             onClick={() => primaryMutation.mutate(k.id)}
                             disabled={primaryMutation.isPending}
-                            title="Set as primary"
+                            title={t("set_as_primary")}
                             className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                           >
                             <StarOff className="w-3.5 h-3.5" />
                           </button>
                         )}
                         {k.isPrimary === 1 && (
-                          <span className="p-1.5 text-amber-500" title="Primary key">
+                          <span className="p-1.5 text-amber-500" title={t("primary_key")}>
                             <Star className="w-3.5 h-3.5 fill-current" />
                           </span>
                         )}
                         <button
-                          onClick={() => confirm("Remove this API key?") && deleteMutation.mutate(k.id)}
+                          onClick={() => confirm(t("confirm_remove_key")) && deleteMutation.mutate(k.id)}
                           className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -243,24 +246,24 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-semibold text-foreground">Session key</span>
+                <span className="text-sm font-semibold text-foreground">{t("session_key_heading")}</span>
               </div>
               {sessionKey && (
                 <span className="flex items-center gap-1.5 text-xs font-medium text-green-600 dark:text-green-400">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                  Active
+                  {t("session_key_active")}
                 </span>
               )}
             </div>
             <div className="p-4 space-y-3">
               <p className="text-xs text-muted-foreground">
-                A session key is kept in memory only and never written to disk. It is cleared when you close this tab. Use this if you don't want to save your key on the server.
+                {t("session_key_desc")}
               </p>
               {sessionKey ? (
                 <div className="flex items-center gap-3 p-3 rounded-lg border border-green-200 dark:border-green-800/40 bg-green-50 dark:bg-green-900/20">
                   <Check className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-green-800 dark:text-green-300">Session key is active.</p>
+                    <p className="text-sm font-medium text-green-800 dark:text-green-300">{t("session_key_is_active")}</p>
                     <p className="text-xs text-green-700/80 dark:text-green-400/80 font-mono mt-0.5">
                       {sessionKey.slice(0, 10)}••••••••{sessionKey.slice(-4)}
                     </p>
@@ -269,7 +272,7 @@ export default function SettingsPage() {
                     onClick={() => { setSessionKey(null); toast({ title: "Session key cleared." }); }}
                     className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    <Unlink className="w-3.5 h-3.5" /> Clear
+                    <Unlink className="w-3.5 h-3.5" /> {t("btn_clear")}
                   </button>
                 </div>
               ) : (
@@ -279,7 +282,7 @@ export default function SettingsPage() {
                       onClick={() => setShowSessionInput(true)}
                       className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                     >
-                      <Plus className="w-4 h-4" /> Use a session key
+                      <Plus className="w-4 h-4" /> {t("btn_use_session_key")}
                     </button>
                   ) : (
                     <div className="space-y-2">
@@ -296,7 +299,7 @@ export default function SettingsPage() {
                               setSessionKey(sessionInput.trim());
                               setSessionInput("");
                               setShowSessionInput(false);
-                              toast({ title: "Session key active.", description: "Cleared when you close this tab." });
+                              toast({ title: t("toast_session_key_title"), description: "Cleared when you close this tab." });
                             }
                           }}
                         />
@@ -308,19 +311,19 @@ export default function SettingsPage() {
                         </button>
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline" onClick={() => { setShowSessionInput(false); setSessionInput(""); }} className="flex-1">Cancel</Button>
+                        <Button size="sm" variant="outline" onClick={() => { setShowSessionInput(false); setSessionInput(""); }} className="flex-1">{t("btn_cancel")}</Button>
                         <Button
                           size="sm"
                           onClick={() => {
                             setSessionKey(sessionInput.trim());
                             setSessionInput("");
                             setShowSessionInput(false);
-                            toast({ title: "Session key active.", description: "Cleared when you close this tab." });
+                            toast({ title: t("toast_session_key_title"), description: "Cleared when you close this tab." });
                           }}
                           disabled={sessionInput.trim().length < 10}
                           className="flex-1"
                         >
-                          Activate
+                          {t("btn_activate")}
                         </Button>
                       </div>
                     </div>
@@ -332,23 +335,23 @@ export default function SettingsPage() {
 
           {/* ── Appearance ──────────────────────────────────── */}
           <div className="border border-border rounded-xl p-4 bg-card space-y-3">
-            <h2 className="text-sm font-semibold text-foreground">Appearance</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t("appearance_heading")}</h2>
             <div className="grid grid-cols-2 gap-2">
-              {(["light", "dark"] as const).map(t => (
+              {(["light", "dark"] as const).map(th => (
                 <button
-                  key={t}
-                  data-testid={`btn-${t}-mode`}
-                  onClick={() => setTheme(t)}
+                  key={th}
+                  data-testid={`btn-${th}-mode`}
+                  onClick={() => setTheme(th)}
                   className={cn(
                     "flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm transition-all",
-                    theme === t
+                    theme === th
                       ? "border-foreground bg-accent text-foreground font-medium"
                       : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
                   )}
                 >
-                  {t === "light" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                  {t === "light" ? "Light" : "Dark"}
-                  {theme === t && <CheckCircle2 className="w-3.5 h-3.5 ml-auto" />}
+                  {th === "light" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  {th === "light" ? t("theme_light") : t("theme_dark")}
+                  {theme === th && <CheckCircle2 className="w-3.5 h-3.5 ml-auto" />}
                 </button>
               ))}
             </div>
@@ -356,21 +359,21 @@ export default function SettingsPage() {
 
           {/* ── About ───────────────────────────────────────── */}
           <div className="border border-border rounded-xl p-4 bg-card space-y-3">
-            <h2 className="text-sm font-semibold text-foreground">About Mercury</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t("about_heading")}</h2>
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Version</span>
+                <span className="text-muted-foreground">{t("about_version")}</span>
                 <span className="font-mono text-xs text-foreground">{__APP_VERSION__}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Powered by</span>
+                <span className="text-muted-foreground">{t("about_powered")}</span>
                 <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer"
                   className="text-xs text-foreground flex items-center gap-1 hover:opacity-70 transition-opacity">
                   OpenRouter <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Source</span>
+                <span className="text-muted-foreground">{t("about_source")}</span>
                 <a href="https://github.com/paulfxyz/mercury" target="_blank" rel="noopener noreferrer"
                   className="text-xs text-foreground flex items-center gap-1 hover:opacity-70 transition-opacity">
                   github.com/paulfxyz/mercury <ExternalLink className="w-3 h-3" />
@@ -385,26 +388,26 @@ export default function SettingsPage() {
               onClick={() => setShowDanger(!showDanger)}
               className="w-full flex items-center justify-between text-sm font-semibold text-destructive"
             >
-              Danger zone
+              {t("danger_zone")}
               {showDanger ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
             {showDanger && (
               <div className="space-y-3 pt-1 border-t border-destructive/20">
                 <div className="flex items-start justify-between gap-4 pt-2">
                   <div>
-                    <p className="text-sm font-medium text-foreground">Delete all inquiries</p>
-                    <p className="text-xs text-muted-foreground">Permanently removes all sessions, history and results.</p>
+                    <p className="text-sm font-medium text-foreground">{t("delete_inquiries_title")}</p>
+                    <p className="text-xs text-muted-foreground">{t("delete_inquiries_desc")}</p>
                   </div>
                   <Button
                     data-testid="btn-delete-all-sessions"
                     variant="destructive"
                     size="sm"
-                    onClick={() => confirm("Delete ALL inquiry history? This cannot be undone.") && clearSessionsMutation.mutate()}
+                    onClick={() => confirm(t("confirm_delete_all")) && clearSessionsMutation.mutate()}
                     disabled={clearSessionsMutation.isPending}
                     className="flex-shrink-0"
                   >
                     <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                    {clearSessionsMutation.isPending ? "Deleting…" : "Delete all"}
+                    {clearSessionsMutation.isPending ? t("btn_deleting") : t("btn_delete_all")}
                   </Button>
                 </div>
               </div>

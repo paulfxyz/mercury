@@ -15,6 +15,7 @@ import {
   ChevronRight, Bolt, SlidersHorizontal, ThumbsUp, CornerDownRight,
 } from "lucide-react";
 import type { Workflow, Session } from "@shared/schema";
+import { useI18n } from "@/lib/i18n";
 
 interface ModelOption { id: string; name: string; }
 interface WizardStep { modelId: string; label: string; systemPrompt: string; }
@@ -49,13 +50,14 @@ function StepDot({ n, active, done }: { n: number; active: boolean; done: boolea
 
 // ─── Model search ──────────────────────────────────────────────
 function ModelSearch({
-  models, loading, onSelect, placeholder = "Search models…",
+  models, loading, onSelect, placeholder,
 }: {
   models: ModelOption[];
   loading: boolean;
   onSelect: (m: ModelOption) => void;
   placeholder?: string;
 }) {
+  const { t } = useI18n();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -78,7 +80,7 @@ function ModelSearch({
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
         <Input
           className="pl-9 text-sm"
-          placeholder={placeholder}
+          placeholder={placeholder ?? t("search_models")}
           value={q}
           onChange={e => { setQ(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
@@ -86,10 +88,10 @@ function ModelSearch({
       </div>
       {open && (
         <div className="absolute top-full left-0 right-0 mt-1 border border-border rounded-xl bg-background shadow-2xl z-50 max-h-64 overflow-y-auto">
-          {loading && <div className="px-4 py-3 text-xs text-muted-foreground">Loading models…</div>}
+          {loading && <div className="px-4 py-3 text-xs text-muted-foreground">{t("model_loading")}</div>}
           {!loading && filtered.length === 0 && (
             <div className="px-4 py-3 text-xs text-muted-foreground">
-              {q ? `No models found for "${q}"` : "Start typing to search…"}
+              {q ? `${t("model_no_results")} "${q}"` : t("model_start_typing")}
             </div>
           )}
           {filtered.map(m => (
@@ -120,10 +122,11 @@ function DebateStarter({
   onCustomSetup: () => void;
   launching: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <div className="space-y-2.5 animate-fade-in-up">
       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-0.5">
-        How do you want to run the debate?
+        {t("debate_how")}
       </p>
 
       <button
@@ -142,11 +145,11 @@ function DebateStarter({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold text-foreground">Quick debate</p>
-            <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-medium">Recommended</Badge>
+            <p className="text-sm font-semibold text-foreground">{t("quick_debate_title")}</p>
+            <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-medium">{t("quick_debate_badge")}</Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Top 3 models · {QUICK_ROUNDS} rounds · temp {QUICK_TEMP} — fast and reliable.
+            {t("quick_debate_desc_tmpl").replace("{rounds}", String(QUICK_ROUNDS)).replace("{temp}", String(QUICK_TEMP))}
           </p>
           <div className="flex flex-wrap gap-1 mt-2">
             {["GPT-4o", "Claude 3.5", "Gemini 2.0"].map(l => (
@@ -211,8 +214,8 @@ function DebateStarter({
           <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground">Custom setup</p>
-          <p className="text-xs text-muted-foreground">Choose models, rounds, temperature and more.</p>
+          <p className="text-sm font-medium text-foreground">{t("custom_setup_title")}</p>
+          <p className="text-xs text-muted-foreground">{t("custom_setup_desc")}</p>
         </div>
         <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground flex-shrink-0 transition-colors" />
       </button>
@@ -228,6 +231,7 @@ function InquiryWizard({
   onClose: () => void;
   onLaunch: (cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string }) => void;
 }) {
+  const { t } = useI18n();
   const { data: workflows = [] } = useQuery<Workflow[]>({ queryKey: ["/api/workflows"] });
   const { data: models = [], isLoading: modelsLoading } = useQuery<ModelOption[]>({ queryKey: ["/api/models"], staleTime: 60_000 });
   const { toast } = useToast();
@@ -256,7 +260,7 @@ function InquiryWizard({
 
   async function handleLaunch() {
     if (!steps.length) {
-      toast({ title: "Please add at least one model to your expert team.", variant: "destructive" });
+      toast({ title: t("toast_no_model"), variant: "destructive" });
       return;
     }
     let workflowId: string | undefined;
@@ -271,9 +275,9 @@ function InquiryWizard({
         const wf = await res.json();
         workflowId = wf.id;
         await queryClient.invalidateQueries({ queryKey: ["/api/workflows"] });
-        toast({ title: `Workflow "${saveName.trim()}" saved successfully.`, description: "It is ready to use in future inquiries." });
+        toast({ title: t("toast_workflow_saved_title"), description: t("toast_workflow_saved_desc") });
       } catch {
-        toast({ title: "Could not save the workflow.", description: "Your inquiry will still run.", variant: "destructive" });
+        toast({ title: t("toast_workflow_error"), description: t("toast_workflow_error_desc"), variant: "destructive" });
       }
       setSaving(false);
     }
@@ -281,8 +285,8 @@ function InquiryWizard({
   }
 
   const STEPS = [
-    { n: 1, label: "Size" }, { n: 2, label: "Models" },
-    { n: 3, label: "Rounds" }, { n: 4, label: "Config" },
+    { n: 1, label: t("wizard_step_size") }, { n: 2, label: t("wizard_step_models") },
+    { n: 3, label: t("wizard_step_rounds") }, { n: 4, label: t("wizard_step_config") },
   ];
 
   return (
@@ -291,7 +295,7 @@ function InquiryWizard({
         <div className="flex items-center gap-2.5">
           <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
           <div>
-            <p className="text-sm font-semibold text-foreground">Custom setup</p>
+            <p className="text-sm font-semibold text-foreground">{t("wizard_title")}</p>
             <p className="text-xs text-muted-foreground truncate max-w-xs">{query.slice(0, 60)}{query.length > 60 ? "…" : ""}</p>
           </div>
         </div>
@@ -322,8 +326,8 @@ function InquiryWizard({
         {step === 1 && (
           <div className="space-y-4">
             <div>
-              <p className="text-sm font-medium text-foreground mb-0.5">How many experts in your team?</p>
-              <p className="text-xs text-muted-foreground">More experts = richer debate, higher cost. 3–5 is the sweet spot.</p>
+              <p className="text-sm font-medium text-foreground mb-0.5">{t("wizard_how_many")}</p>
+              <p className="text-xs text-muted-foreground">{t("wizard_how_many_sub")}</p>
             </div>
             <div className="grid grid-cols-4 sm:grid-cols-4 gap-2">
               {[2, 3, 4, 5, 6, 8, 10, 12].map(n => (
@@ -333,7 +337,7 @@ function InquiryWizard({
                 )}>{n}</button>
               ))}
             </div>
-            <Button className="w-full" onClick={() => setStep(2)}>Choose models <ChevronRight className="ml-1 w-4 h-4" /></Button>
+            <Button className="w-full" onClick={() => setStep(2)}>{t("btn_choose_models")} <ChevronRight className="ml-1 w-4 h-4" /></Button>
           </div>
         )}
 
@@ -344,7 +348,9 @@ function InquiryWizard({
               <span className="text-xs text-muted-foreground tabular-nums">{steps.length} / {teamSize}</span>
             </div>
             <ModelSearch models={models} loading={modelsLoading} onSelect={addModel}
-              placeholder={steps.length < teamSize ? `Add expert ${steps.length + 1} of ${teamSize}…` : "Team complete"} />
+              placeholder={steps.length < teamSize
+                ? t("model_placeholder_add").replace("{n}", String(steps.length + 1)).replace("{total}", String(teamSize))
+                : t("wizard_team_complete")} />
             <div className="space-y-2">
               {steps.map((s, i) => (
                 <div key={i} className="border border-border rounded-xl bg-card overflow-hidden">
@@ -359,7 +365,7 @@ function InquiryWizard({
                     </button>
                   </div>
                   <div className="px-3.5 pb-3 pt-2 border-t border-border/40">
-                    <Textarea placeholder={`Role for ${s.label.split(" ")[0]}… e.g. "You are a devil's advocate."`}
+                    <Textarea placeholder={t("wizard_role_placeholder_tmpl").replace("{name}", s.label.split(" ")[0])}
                       value={s.systemPrompt} onChange={e => updatePrompt(i, e.target.value)}
                       className="text-xs resize-none bg-transparent border-0 shadow-none focus-visible:ring-0 p-0 placeholder:text-muted-foreground/50 min-h-[2rem]" rows={2} />
                   </div>
@@ -369,7 +375,7 @@ function InquiryWizard({
             {steps.length < teamSize && (
               <p className="text-xs text-muted-foreground text-center">{teamSize - steps.length} more model{teamSize - steps.length !== 1 ? "s" : ""} needed</p>
             )}
-            <Button className="w-full" disabled={steps.length === 0} onClick={() => setStep(3)}>Set debate rounds <ChevronRight className="ml-1 w-4 h-4" /></Button>
+            <Button className="w-full" disabled={steps.length === 0} onClick={() => setStep(3)}>{t("btn_set_rounds")} <ChevronRight className="ml-1 w-4 h-4" /></Button>
           </div>
         )}
 
@@ -377,16 +383,21 @@ function InquiryWizard({
           <div className="space-y-5">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-foreground">Debate rounds</p>
+                <p className="text-sm font-medium text-foreground">{t("wizard_rounds_label")}</p>
                 <span className="text-sm font-mono font-bold text-foreground">{rounds}</span>
               </div>
               <input type="range" min={5} max={30} value={rounds} onChange={e => setRounds(+e.target.value)} className="w-full accent-foreground" />
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>5 — Quick</span><span>15 — Balanced</span><span>30 — Deep</span>
+                <span>{t("rounds_quick")}</span><span>{t("rounds_balanced")}</span><span>{t("rounds_deep")}</span>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">~1 API call per model per round. {rounds} rounds × {steps.length || "?"} models = ~{rounds * (steps.length || 3)} calls.</p>
-            <Button className="w-full" onClick={() => setStep(4)}>Temperature &amp; consensus <ChevronRight className="ml-1 w-4 h-4" /></Button>
+            <p className="text-xs text-muted-foreground">
+              {t("wizard_api_calls_tmpl")
+                .replace("{rounds}", String(rounds))
+                .replace("{models}", String(steps.length || "?"))
+                .replace("{total}", String(rounds * (steps.length || 3)))}
+            </p>
+            <Button className="w-full" onClick={() => setStep(4)}>{t("btn_temp_consensus")} <ChevronRight className="ml-1 w-4 h-4" /></Button>
           </div>
         )}
 
@@ -396,13 +407,13 @@ function InquiryWizard({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Thermometer className="w-3.5 h-3.5 text-muted-foreground" />
-                  <p className="text-sm font-medium text-foreground">Temperature</p>
+                  <p className="text-sm font-medium text-foreground">{t("wizard_temp_label")}</p>
                 </div>
                 <span className="text-sm font-mono font-bold text-foreground">{temperature.toFixed(1)}</span>
               </div>
               <input type="range" min={0} max={1} step={0.1} value={temperature} onChange={e => setTemperature(+e.target.value)} className="w-full accent-foreground" />
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>0 — Precise</span><span>0.7 — Balanced</span><span>1 — Creative</span>
+                <span>{t("temp_precise")}</span><span>{t("temp_balanced")}</span><span>{t("temp_creative")}</span>
               </div>
             </div>
 
@@ -410,18 +421,18 @@ function InquiryWizard({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-muted-foreground" />
-                  <p className="text-sm font-medium text-foreground">Required consensus</p>
+                  <p className="text-sm font-medium text-foreground">{t("wizard_consensus_label")}</p>
                 </div>
                 <span className="text-sm font-mono font-bold text-foreground">{Math.round(threshold * 100)}%</span>
               </div>
               <input type="range" min={0.5} max={1} step={0.05} value={threshold} onChange={e => setThreshold(+e.target.value)} className="w-full accent-foreground" />
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>50% — Loose</span><span>70% — Standard</span><span>100% — Strict</span>
+                <span>{t("consensus_loose")}</span><span>{t("consensus_standard")}</span><span>{t("consensus_strict")}</span>
               </div>
             </div>
 
             <div className="bg-muted/40 rounded-xl p-3.5 text-xs space-y-2">
-              <p className="font-semibold text-foreground">Summary</p>
+              <p className="font-semibold text-foreground">{t("wizard_summary_title")}</p>
               <p className="text-muted-foreground">
                 {steps.length} model{steps.length !== 1 ? "s" : ""} · {rounds} rounds · temp {temperature.toFixed(1)} · {Math.round(threshold * 100)}% consensus
               </p>
@@ -440,10 +451,10 @@ function InquiryWizard({
                   {wantToSave && <Check className="w-2.5 h-2.5 text-background" />}
                 </button>
                 <div className="flex-1 min-w-0">
-                  <button onClick={() => setWantToSave(!wantToSave)} className="text-sm font-medium text-foreground text-left">Save as a workflow</button>
-                  <p className="text-xs text-muted-foreground mt-0.5">Reuse this configuration in future inquiries.</p>
+                  <button onClick={() => setWantToSave(!wantToSave)} className="text-sm font-medium text-foreground text-left">{t("save_workflow_title")}</button>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("save_workflow_desc")}</p>
                   {wantToSave && (
-                    <Input autoFocus className="mt-2.5 text-sm" placeholder="Name it, e.g. Deep Research, Devil's Advocate…"
+                    <Input autoFocus className="mt-2.5 text-sm" placeholder={t("save_workflow_placeholder")}
                       value={saveName} onChange={e => setSaveName(e.target.value)}
                       onKeyDown={e => e.key === "Enter" && saveName.trim() && handleLaunch()} />
                   )}
@@ -453,10 +464,10 @@ function InquiryWizard({
             </div>
 
             <Button className="w-full" onClick={handleLaunch} disabled={saving || steps.length === 0 || (wantToSave && !saveName.trim())}>
-              {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</> : "Launch inquiry →"}
+              {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t("btn_saving")}</> : t("btn_launch")}
             </Button>
             {wantToSave && !saveName.trim() && (
-              <p className="text-xs text-muted-foreground text-center -mt-2">Enter a name to continue.</p>
+              <p className="text-xs text-muted-foreground text-center -mt-2">{t("enter_name")}</p>
             )}
           </div>
         )}
@@ -473,24 +484,25 @@ function QuickAnswerBanner({
   onAccept: () => void;
   loading: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <div className="border border-border rounded-xl overflow-hidden bg-card animate-fade-in-up">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
         <Zap className="w-3.5 h-3.5 text-amber-500" />
-        <span className="text-xs font-semibold text-foreground">Initial answer</span>
-        <span className="text-xs text-muted-foreground ml-1">— Want to make sure? Run the expert debate below.</span>
+        <span className="text-xs font-semibold text-foreground">{t("initial_answer_title")}</span>
+        <span className="text-xs text-muted-foreground ml-1">{t("initial_answer_sub")}</span>
       </div>
       {loading ? (
         <div className="px-4 py-6 flex items-center justify-center gap-3">
           <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Getting an initial answer…</span>
+          <span className="text-sm text-muted-foreground">{t("getting_answer")}</span>
         </div>
       ) : (
         <div className="px-4 py-4 space-y-3">
           <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{answer}</p>
           <button onClick={onAccept} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
             <ThumbsUp className="w-3.5 h-3.5" />
-            Accept this answer
+            {t("accept_answer")}
           </button>
         </div>
       )}
@@ -507,6 +519,7 @@ function FollowUpBar({
   onSubmit: (q: string) => void;
   isProcessing: boolean;
 }) {
+  const { t } = useI18n();
   const [followUp, setFollowUp] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -523,7 +536,7 @@ function FollowUpBar({
       {/* Collapsed previous answer */}
       <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1.5">
         <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-          <ThumbsUp className="w-3 h-3" /> Accepted
+          <ThumbsUp className="w-3 h-3" /> {t("followup_accepted")}
         </p>
         <p className="text-xs text-muted-foreground italic truncate">{prevQuery}</p>
         <p className="text-xs text-foreground/70 line-clamp-2 leading-relaxed">{prevAnswer}</p>
@@ -536,7 +549,7 @@ function FollowUpBar({
       )}>
         <div className="flex items-center gap-2 px-4 pt-3 pb-1">
           <CornerDownRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-          <span className="text-xs font-medium text-muted-foreground">Ask a follow-up</span>
+          <span className="text-xs font-medium text-muted-foreground">{t("ask_followup")}</span>
         </div>
         <Textarea
           ref={ref}
@@ -545,14 +558,14 @@ function FollowUpBar({
           onKeyDown={e => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (followUp.trim()) onSubmit(followUp.trim()); }
           }}
-          placeholder="Dig deeper, challenge the answer, or explore a related angle…"
+          placeholder={t("followup_placeholder")}
           className="border-0 shadow-none resize-none focus-visible:ring-0 min-h-[64px] text-sm leading-relaxed bg-transparent px-4 pt-1 pb-2"
           rows={2}
           data-testid="input-followup"
         />
         <div className="flex items-center justify-between px-4 py-3">
-          <span className="hidden sm:inline text-xs text-muted-foreground">⌘+Enter to send</span>
-          <span className="sm:hidden text-xs text-muted-foreground">Tap to send</span>
+          <span className="hidden sm:inline text-xs text-muted-foreground">{t("chat_hint_desktop")}</span>
+          <span className="sm:hidden text-xs text-muted-foreground">{t("chat_hint_mobile")}</span>
           <Button
             size="sm"
             onClick={() => { if (followUp.trim()) onSubmit(followUp.trim()); }}
@@ -560,8 +573,8 @@ function FollowUpBar({
             className="rounded-lg h-8 px-3 gap-1.5"
           >
             {isProcessing
-              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Thinking…</>
-              : <>Inquire <ArrowUp className="w-3.5 h-3.5" /></>
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {t("btn_thinking")}</>
+              : <>{t("btn_inquire")} <ArrowUp className="w-3.5 h-3.5" /></>
             }
           </Button>
         </div>
@@ -572,6 +585,7 @@ function FollowUpBar({
 
 // ─── Main chat page ────────────────────────────────────────────
 export default function ChatPage() {
+  const { t } = useI18n();
   const search = useSearch();
   const [query, setQuery] = useState(() => {
     // Pre-fill from ?q= URL param (set by session follow-up)
@@ -593,8 +607,8 @@ export default function ChatPage() {
     const q = params.get("q");
     if (q?.trim()) {
       setQuery(q);
-      const t = setTimeout(() => { quickMutation.mutate(q.trim()); }, 80);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => { quickMutation.mutate(q.trim()); }, 80);
+      return () => clearTimeout(timer);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -618,7 +632,7 @@ export default function ChatPage() {
       navigate(`/session/${data.sessionId}`);
     },
     onError: () => {
-      toast({ title: "Could not start the inquiry.", description: "Please check your API key in Settings and try again.", variant: "destructive" });
+      toast({ title: t("toast_inquiry_error_title"), description: t("toast_inquiry_error_desc"), variant: "destructive" });
     },
   });
 
@@ -642,9 +656,9 @@ export default function ChatPage() {
               {/* Hero */}
               <div className="text-center space-y-2">
                 <div className="text-3xl sm:text-4xl select-none">☿</div>
-                <h1 className="text-lg sm:text-xl font-semibold text-foreground">What do you want to inquire?</h1>
+                <h1 className="text-lg sm:text-xl font-semibold text-foreground">{t("chat_hero_title")}</h1>
                 <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                  Every inquiry gets an instant answer, then you can run the full expert debate.
+                  {t("chat_hero_sub")}
                 </p>
               </div>
 
@@ -661,13 +675,13 @@ export default function ChatPage() {
                   onKeyDown={e => {
                     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSubmit(); }
                   }}
-                  placeholder="Ask anything — e.g. What are the strongest arguments for and against UBI?"
+                  placeholder={t("chat_placeholder")}
                   className="border-0 shadow-none resize-none focus-visible:ring-0 min-h-[88px] text-sm leading-relaxed bg-transparent px-4 pt-4"
                   rows={3}
                 />
                 <div className="flex items-center justify-between px-4 py-3">
-                  <span className="hidden sm:inline text-xs text-muted-foreground">⌘+Enter to send</span>
-                  <span className="sm:hidden text-xs text-muted-foreground">Tap to send</span>
+                  <span className="hidden sm:inline text-xs text-muted-foreground">{t("chat_hint_desktop")}</span>
+                  <span className="sm:hidden text-xs text-muted-foreground">{t("chat_hint_mobile")}</span>
                   <Button
                     data-testid="btn-submit-query"
                     size="sm"
@@ -676,8 +690,8 @@ export default function ChatPage() {
                     className="rounded-lg h-8 px-3 gap-1.5"
                   >
                     {isProcessing
-                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Thinking…</>
-                      : <>Inquire <ArrowUp className="w-3.5 h-3.5" /></>
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {t("btn_thinking")}</>
+                      : <>{t("btn_inquire")} <ArrowUp className="w-3.5 h-3.5" /></>
                     }
                   </Button>
                 </div>
@@ -686,7 +700,7 @@ export default function ChatPage() {
               {/* Recent sessions */}
               {recentSessions.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Recent inquiries</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("recent_title")}</p>
                   <div className="grid gap-1.5">
                     {recentSessions.map(s => (
                       <button

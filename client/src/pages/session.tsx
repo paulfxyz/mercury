@@ -18,6 +18,8 @@ import {
   Bolt, GitBranch, Star, Save, Thermometer, SlidersHorizontal, Search,
 } from "lucide-react";
 import type { Session, Iteration, Workflow } from "@shared/schema";
+import { useI18n } from "@/lib/i18n";
+import type { TranslationKey } from "@/lib/i18n";
 
 interface LiveResponse { modelId: string; modelName: string; content: string; }
 interface LiveIteration {
@@ -40,13 +42,15 @@ const QUICK_ROUNDS = 3;
 const QUICK_TEMP = 0.3;
 const QUICK_THRESHOLD = 0.7;
 
-const PHASE_CFG: Record<string, { icon: React.ElementType; label: string; color: string; bg: string }> = {
-  research:  { icon: FlaskConical,  label: "Research",  color: "text-blue-600 dark:text-blue-400",    bg: "bg-blue-50 dark:bg-blue-900/20" },
-  debate:    { icon: MessageCircle, label: "Debate",    color: "text-amber-600 dark:text-amber-400",  bg: "bg-amber-50 dark:bg-amber-900/20" },
-  vote:      { icon: Vote,          label: "Vote",      color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-900/20" },
-  synthesis: { icon: BarChart3,     label: "Synthesis", color: "text-teal-600 dark:text-teal-400",    bg: "bg-teal-50 dark:bg-teal-900/20" },
-  final:     { icon: Award,         label: "Final",     color: "text-green-600 dark:text-green-400",  bg: "bg-green-50 dark:bg-green-900/20" },
-};
+function getPhaseCfg(t: (k: TranslationKey) => string): Record<string, { icon: React.ElementType; label: string; color: string; bg: string }> {
+  return {
+    research:  { icon: FlaskConical,  label: t("phase_research"),  color: "text-blue-600 dark:text-blue-400",    bg: "bg-blue-50 dark:bg-blue-900/20" },
+    debate:    { icon: MessageCircle, label: t("phase_debate"),    color: "text-amber-600 dark:text-amber-400",  bg: "bg-amber-50 dark:bg-amber-900/20" },
+    vote:      { icon: Vote,          label: t("phase_vote"),      color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-900/20" },
+    synthesis: { icon: BarChart3,     label: t("phase_synthesis"), color: "text-teal-600 dark:text-teal-400",    bg: "bg-teal-50 dark:bg-teal-900/20" },
+    final:     { icon: Award,         label: t("phase_final"),     color: "text-green-600 dark:text-green-400",  bg: "bg-green-50 dark:bg-green-900/20" },
+  };
+}
 const PHASES = ["research", "debate", "vote", "synthesis", "final"];
 
 function renderMarkdown(md: string): string {
@@ -154,6 +158,7 @@ function DebateStarter({ query, onLaunchDebate, onCustomSetup }: {
   onLaunchDebate: (cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string }) => void;
   onCustomSetup: () => void;
 }) {
+  const { t } = useI18n();
   const { data: workflows = [], isLoading: wfLoading } = useQuery<Workflow[]>({ queryKey: ["/api/workflows"] });
   const [launching, setLaunching] = useState(false);
 
@@ -161,7 +166,7 @@ function DebateStarter({ query, onLaunchDebate, onCustomSetup }: {
 
   return (
     <div className="space-y-2.5 animate-fade-in-up">
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">How do you want to run the debate?</p>
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("debate_how")}</p>
       <button onClick={() => launch({ selectedModels: QUICK_MODELS, iterations: QUICK_ROUNDS, temperature: QUICK_TEMP, consensusThreshold: QUICK_THRESHOLD })}
         disabled={launching}
         className={cn("w-full text-left p-4 rounded-xl border border-border hover:border-foreground/30 hover:bg-accent/20 transition-all group flex items-start gap-3.5", launching && "opacity-50 cursor-not-allowed")}>
@@ -170,10 +175,12 @@ function DebateStarter({ query, onLaunchDebate, onCustomSetup }: {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold text-foreground">Quick debate</p>
-            <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-medium">Recommended</Badge>
+            <p className="text-sm font-semibold text-foreground">{t("quick_debate_title")}</p>
+            <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-medium">{t("quick_debate_badge")}</Badge>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">Top 3 models · {QUICK_ROUNDS} rounds · temp {QUICK_TEMP} — fast and reliable.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {t("quick_debate_desc_tmpl").replace("{rounds}", String(QUICK_ROUNDS)).replace("{temp}", String(QUICK_TEMP))}
+          </p>
           <div className="flex flex-wrap gap-1 mt-2">
             {["GPT-4o", "Claude 3.5", "Gemini 2.0"].map(l => <span key={l} className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-medium">{l}</span>)}
           </div>
@@ -207,8 +214,8 @@ function DebateStarter({ query, onLaunchDebate, onCustomSetup }: {
           <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground">Custom setup</p>
-          <p className="text-xs text-muted-foreground">Choose models, rounds, temperature and more.</p>
+          <p className="text-sm font-medium text-foreground">{t("custom_setup_title")}</p>
+          <p className="text-xs text-muted-foreground">{t("custom_setup_desc")}</p>
         </div>
         <ChevronDown className="w-4 h-4 -rotate-90 text-muted-foreground group-hover:text-foreground flex-shrink-0 transition-colors" />
       </button>
@@ -221,6 +228,7 @@ function InquiryWizard({ query, onClose, onLaunch }: {
   query: string; onClose: () => void;
   onLaunch: (cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string }) => void;
 }) {
+  const { t } = useI18n();
   const { data: workflows = [] } = useQuery<Workflow[]>({ queryKey: ["/api/workflows"] });
   const { data: models = [], isLoading: modelsLoading } = useQuery<ModelOption[]>({ queryKey: ["/api/models"], staleTime: 60_000 });
   const { toast } = useToast();
@@ -241,7 +249,7 @@ function InquiryWizard({ query, onClose, onLaunch }: {
   function updatePrompt(i: number, v: string) { setWSteps(prev => prev.map((s, j) => j === i ? { ...s, systemPrompt: v } : s)); }
 
   async function handleLaunch() {
-    if (!wSteps.length) { toast({ title: "Please add at least one model.", variant: "destructive" }); return; }
+    if (!wSteps.length) { toast({ title: t("toast_no_model"), variant: "destructive" }); return; }
     let workflowId: string | undefined;
     if (wantToSave && saveName.trim()) {
       setSaving(true);
@@ -249,20 +257,28 @@ function InquiryWizard({ query, onClose, onLaunch }: {
         const res = await apiRequest("POST", "/api/workflows", { name: saveName.trim(), steps: wSteps, iterations: rounds, temperature, consensusThreshold: threshold, isDefault: workflows.length === 0 });
         const wf = await res.json(); workflowId = wf.id;
         await queryClient.invalidateQueries({ queryKey: ["/api/workflows"] });
-        toast({ title: `Workflow "${saveName.trim()}" saved.` });
-      } catch { toast({ title: "Could not save workflow.", variant: "destructive" }); }
+        toast({ title: t("toast_workflow_saved_title"), description: t("toast_workflow_saved_desc") });
+      } catch { toast({ title: t("toast_workflow_error"), description: t("toast_workflow_error_desc"), variant: "destructive" }); }
       setSaving(false);
     }
     onLaunch({ selectedModels: wSteps.map(s => s.modelId), iterations: rounds, temperature, consensusThreshold: threshold, workflowId });
   }
 
-  const WSTEPS = [{ n: 1, label: "Size" }, { n: 2, label: "Models" }, { n: 3, label: "Rounds" }, { n: 4, label: "Config" }];
+  const WSTEPS = [
+    { n: 1, label: t("wizard_step_size") },
+    { n: 2, label: t("wizard_step_models") },
+    { n: 3, label: t("wizard_step_rounds") },
+    { n: 4, label: t("wizard_step_config") },
+  ];
   return (
     <div className="flex flex-col h-full w-full max-w-xl border-l border-border bg-background">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
         <div className="flex items-center gap-2.5">
           <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
-          <div><p className="text-sm font-semibold text-foreground">Custom setup</p><p className="text-xs text-muted-foreground truncate max-w-xs">{query.slice(0, 60)}{query.length > 60 ? "…" : ""}</p></div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">{t("wizard_title")}</p>
+            <p className="text-xs text-muted-foreground truncate max-w-xs">{query.slice(0, 60)}{query.length > 60 ? "…" : ""}</p>
+          </div>
         </div>
         <button onClick={onClose} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"><X className="w-4 h-4" /></button>
       </div>
@@ -286,14 +302,14 @@ function InquiryWizard({ query, onClose, onLaunch }: {
       <div ref={bodyRef} className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
         {step === 1 && (
           <div className="space-y-4">
-            <p className="text-sm font-medium text-foreground">How many experts in your team?</p>
+            <p className="text-sm font-medium text-foreground">{t("wizard_how_many")}</p>
             <div className="grid grid-cols-4 gap-2">
               {[2,3,4,5,6,8,10,12].map(n => (
                 <button key={n} onClick={() => setTeamSize(n)} className={cn("py-3 rounded-xl border text-sm font-semibold transition-all",
                   teamSize === n ? "bg-foreground text-background border-foreground" : "border-border text-foreground hover:border-foreground/40")}>{n}</button>
               ))}
             </div>
-            <Button className="w-full" onClick={() => setStep(2)}>Choose models <ChevronDown className="ml-1 w-4 h-4 -rotate-90" /></Button>
+            <Button className="w-full" onClick={() => setStep(2)}>{t("btn_choose_models")} <ChevronDown className="ml-1 w-4 h-4 -rotate-90" /></Button>
           </div>
         )}
         {step === 2 && (
@@ -303,7 +319,9 @@ function InquiryWizard({ query, onClose, onLaunch }: {
               <span className="text-xs text-muted-foreground tabular-nums">{wSteps.length} / {teamSize}</span>
             </div>
             <ModelSearch models={models} loading={modelsLoading} onSelect={addModel}
-              placeholder={wSteps.length < teamSize ? `Add expert ${wSteps.length + 1} of ${teamSize}…` : "Team complete"} />
+              placeholder={wSteps.length < teamSize
+                ? t("model_placeholder_add").replace("{n}", String(wSteps.length + 1)).replace("{total}", String(teamSize))
+                : t("wizard_team_complete")} />
             <div className="space-y-2">
               {wSteps.map((s, i) => (
                 <div key={i} className="border border-border rounded-xl bg-card overflow-hidden">
@@ -313,42 +331,53 @@ function InquiryWizard({ query, onClose, onLaunch }: {
                     <button onClick={() => removeModel(i)} className="text-muted-foreground hover:text-destructive transition-colors p-1"><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                   <div className="px-3.5 pb-3 pt-2 border-t border-border/40">
-                    <Textarea placeholder={`Role for ${s.label.split(" ")[0]}…`} value={s.systemPrompt} onChange={e => updatePrompt(i, e.target.value)}
+                    <Textarea
+                      placeholder={t("wizard_role_placeholder_tmpl").replace("{name}", s.label.split(" ")[0])}
+                      value={s.systemPrompt} onChange={e => updatePrompt(i, e.target.value)}
                       className="text-xs resize-none bg-transparent border-0 shadow-none focus-visible:ring-0 p-0 placeholder:text-muted-foreground/50 min-h-[2rem]" rows={2} />
                   </div>
                 </div>
               ))}
             </div>
-            <Button className="w-full" disabled={wSteps.length === 0} onClick={() => setStep(3)}>Set rounds <ChevronDown className="ml-1 w-4 h-4 -rotate-90" /></Button>
+            <Button className="w-full" disabled={wSteps.length === 0} onClick={() => setStep(3)}>{t("btn_set_rounds")} <ChevronDown className="ml-1 w-4 h-4 -rotate-90" /></Button>
           </div>
         )}
         {step === 3 && (
           <div className="space-y-5">
             <div className="space-y-3">
-              <div className="flex items-center justify-between"><p className="text-sm font-medium text-foreground">Debate rounds</p><span className="text-sm font-mono font-bold text-foreground">{rounds}</span></div>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-foreground">{t("wizard_rounds_label")}</p>
+                <span className="text-sm font-mono font-bold text-foreground">{rounds}</span>
+              </div>
               <input type="range" min={5} max={30} value={rounds} onChange={e => setRounds(+e.target.value)} className="w-full accent-foreground" />
-              <div className="flex justify-between text-xs text-muted-foreground"><span>5 — Quick</span><span>15 — Balanced</span><span>30 — Deep</span></div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{t("rounds_quick")}</span><span>{t("rounds_balanced")}</span><span>{t("rounds_deep")}</span>
+              </div>
             </div>
-            <Button className="w-full" onClick={() => setStep(4)}>Temperature &amp; consensus <ChevronDown className="ml-1 w-4 h-4 -rotate-90" /></Button>
+            <Button className="w-full" onClick={() => setStep(4)}>{t("btn_temp_consensus")} <ChevronDown className="ml-1 w-4 h-4 -rotate-90" /></Button>
           </div>
         )}
         {step === 4 && (
           <div className="space-y-5">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2"><Thermometer className="w-3.5 h-3.5 text-muted-foreground" /><p className="text-sm font-medium text-foreground">Temperature</p></div>
+                <div className="flex items-center gap-2"><Thermometer className="w-3.5 h-3.5 text-muted-foreground" /><p className="text-sm font-medium text-foreground">{t("wizard_temp_label")}</p></div>
                 <span className="text-sm font-mono font-bold text-foreground">{temperature.toFixed(1)}</span>
               </div>
               <input type="range" min={0} max={1} step={0.1} value={temperature} onChange={e => setTemperature(+e.target.value)} className="w-full accent-foreground" />
-              <div className="flex justify-between text-xs text-muted-foreground"><span>0 — Precise</span><span>0.7 — Balanced</span><span>1 — Creative</span></div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{t("temp_precise")}</span><span>{t("temp_balanced")}</span><span>{t("temp_creative")}</span>
+              </div>
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-muted-foreground" /><p className="text-sm font-medium text-foreground">Required consensus</p></div>
+                <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-muted-foreground" /><p className="text-sm font-medium text-foreground">{t("wizard_consensus_label")}</p></div>
                 <span className="text-sm font-mono font-bold text-foreground">{Math.round(threshold * 100)}%</span>
               </div>
               <input type="range" min={0.5} max={1} step={0.05} value={threshold} onChange={e => setThreshold(+e.target.value)} className="w-full accent-foreground" />
-              <div className="flex justify-between text-xs text-muted-foreground"><span>50% — Loose</span><span>70% — Standard</span><span>100% — Strict</span></div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{t("consensus_loose")}</span><span>{t("consensus_standard")}</span><span>{t("consensus_strict")}</span>
+              </div>
             </div>
             <div className={cn("rounded-xl border transition-all", wantToSave ? "border-foreground/30 bg-accent/30 p-4" : "border-border p-3.5")}>
               <div className="flex items-start gap-3">
@@ -356,14 +385,14 @@ function InquiryWizard({ query, onClose, onLaunch }: {
                   {wantToSave && <Check className="w-2.5 h-2.5 text-background" />}
                 </button>
                 <div className="flex-1 min-w-0">
-                  <button onClick={() => setWantToSave(!wantToSave)} className="text-sm font-medium text-foreground text-left">Save as a workflow</button>
-                  {wantToSave && <Input autoFocus className="mt-2 text-sm" placeholder="Name it…" value={saveName} onChange={e => setSaveName(e.target.value)} onKeyDown={e => e.key === "Enter" && saveName.trim() && handleLaunch()} />}
+                  <button onClick={() => setWantToSave(!wantToSave)} className="text-sm font-medium text-foreground text-left">{t("save_workflow_title")}</button>
+                  {wantToSave && <Input autoFocus className="mt-2 text-sm" placeholder={t("save_workflow_placeholder")} value={saveName} onChange={e => setSaveName(e.target.value)} onKeyDown={e => e.key === "Enter" && saveName.trim() && handleLaunch()} />}
                 </div>
                 <Save className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
               </div>
             </div>
             <Button className="w-full" onClick={handleLaunch} disabled={saving || wSteps.length === 0 || (wantToSave && !saveName.trim())}>
-              {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</> : "Launch inquiry →"}
+              {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t("btn_saving")}</> : t("btn_launch")}
             </Button>
           </div>
         )}
@@ -372,12 +401,12 @@ function InquiryWizard({ query, onClose, onLaunch }: {
   );
 }
 
-function PhaseTimeline({ currentPhase }: { currentPhase: string }) {
+function PhaseTimeline({ currentPhase, phaseCfg }: { currentPhase: string; phaseCfg: ReturnType<typeof getPhaseCfg> }) {
   const idx = PHASES.indexOf(currentPhase);
   return (
     <div className="flex items-center gap-0.5">
       {PHASES.map((phase, i) => {
-        const cfg = PHASE_CFG[phase];
+        const cfg = phaseCfg[phase];
         const Icon = cfg.icon;
         const done = idx > i;
         const cur = idx === i;
@@ -415,13 +444,13 @@ function PhaseTimeline({ currentPhase }: { currentPhase: string }) {
 }
 
 // ─── Live response stream ─────────────────────────────────────
-function LivePanel({ iters }: { iters: LiveIteration[] }) {
+function LivePanel({ iters, phaseCfg }: { iters: LiveIteration[]; phaseCfg: ReturnType<typeof getPhaseCfg> }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [iters.length]);
   return (
     <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
       {iters.map((iter) => {
-        const cfg = PHASE_CFG[iter.phase] ?? PHASE_CFG.research;
+        const cfg = phaseCfg[iter.phase] ?? phaseCfg.research;
         const Icon = cfg.icon;
         const pct = iter.consensus ? Math.round(iter.consensus * 100) : null;
         return (
@@ -451,9 +480,9 @@ function LivePanel({ iters }: { iters: LiveIteration[] }) {
 }
 
 // ─── Iteration accordion ──────────────────────────────────────
-function IterCard({ iter, idx }: { iter: LiveIteration; idx: number }) {
+function IterCard({ iter, idx, phaseCfg }: { iter: LiveIteration; idx: number; phaseCfg: ReturnType<typeof getPhaseCfg> }) {
   const [open, setOpen] = useState(false);
-  const cfg = PHASE_CFG[iter.phase] ?? PHASE_CFG.research;
+  const cfg = phaseCfg[iter.phase] ?? phaseCfg.research;
   const Icon = cfg.icon;
   const pct = iter.consensus ? Math.round(iter.consensus * 100) : null;
   return (
@@ -488,6 +517,7 @@ function IterCard({ iter, idx }: { iter: LiveIteration; idx: number }) {
 
 // ─── Results section ──────────────────────────────────────────
 function Results({ session, iterations, isQuick }: { session: Session; iterations: Iteration[]; isQuick?: boolean }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
   const finalAnswer = session.finalAnswer ?? session.quickAnswer ?? "";
@@ -533,7 +563,7 @@ function Results({ session, iterations, isQuick }: { session: Session; iteration
                      : <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground">{isQuick ? "Quick answer" : "Inquiry complete"}</p>
+            <p className="text-sm font-semibold text-foreground">{isQuick ? t("quick_answer_complete") : t("inquiry_complete")}</p>
             <p className="text-xs text-muted-foreground">
               {isQuick ? "Single model · instant response" : `${iterations.length} rounds · ${allModels.length} expert${allModels.length !== 1 ? "s" : ""}`}
             </p>
@@ -557,17 +587,17 @@ function Results({ session, iterations, isQuick }: { session: Session; iteration
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-foreground/50" />
-            <span className="text-sm font-semibold text-foreground">{isQuick ? "Answer" : "Consensus Answer"}</span>
+            <span className="text-sm font-semibold text-foreground">{isQuick ? t("answer_label") : t("consensus_answer")}</span>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
             <button data-testid="btn-copy-answer" onClick={copy}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent border border-border transition-colors">
               {copied ? <CheckCheck className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-              {copied ? "Copied" : "Copy"}
+              {copied ? t("btn_copied") : t("btn_copy")}
             </button>
             <button data-testid="btn-download-answer" onClick={download}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent border border-border transition-colors">
-              <Download className="w-3.5 h-3.5" /> .md
+              <Download className="w-3.5 h-3.5" /> {t("btn_download_md")}
             </button>
           </div>
         </div>
@@ -586,6 +616,8 @@ function Results({ session, iterations, isQuick }: { session: Session; iteration
 // ─── Debate block — self-contained child debate render ────────
 // Fetches and streams a child debate session inline in the parent page.
 function DebateBlock({ entry, idx }: { entry: DebateEntry; idx: number }) {
+  const { t } = useI18n();
+  const phaseCfg = getPhaseCfg(t);
   const [liveIters, setLiveIters] = useState<LiveIteration[]>([]);
   const [currentPhase, setCurrentPhase] = useState("research");
   const [showLive, setShowLive] = useState(true);
@@ -621,7 +653,7 @@ function DebateBlock({ entry, idx }: { entry: DebateEntry; idx: number }) {
           queryClient.invalidateQueries({ queryKey: ["/api/sessions", entry.sessionId] });
           queryClient.invalidateQueries({ queryKey: ["/api/sessions", entry.sessionId, "iterations"] });
         }
-        if (d.type === "error") toast({ title: "Debate failed.", description: d.message, variant: "destructive" });
+        if (d.type === "error") toast({ title: t("toast_debate_failed"), description: d.message, variant: "destructive" });
       } catch {}
     };
     return () => ws.close();
@@ -647,7 +679,9 @@ function DebateBlock({ entry, idx }: { entry: DebateEntry; idx: number }) {
       <div className="flex items-center gap-2 pl-1">
         <div className="w-px h-6 bg-border ml-3" />
         <GitBranch className="w-3.5 h-3.5 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground font-medium">Expert debate {idx + 1}</span>
+        <span className="text-xs text-muted-foreground font-medium">
+          {t("expert_debate_label_tmpl").replace("{n}", String(idx + 1))}
+        </span>
         {entry.query !== "" && <span className="text-xs text-muted-foreground truncate max-w-[200px]">— {entry.query.slice(0, 60)}{entry.query.length > 60 ? "…" : ""}</span>}
       </div>
 
@@ -662,11 +696,11 @@ function DebateBlock({ entry, idx }: { entry: DebateEntry; idx: number }) {
             <span className="text-2xl font-bold text-foreground tabular-nums">{progress}%</span>
           </div>
           <Progress value={progress} className="h-1.5" />
-          <PhaseTimeline currentPhase={currentPhase} />
+          <PhaseTimeline currentPhase={currentPhase} phaseCfg={phaseCfg} />
           <button onClick={() => setShowLive(!showLive)}
             className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors pt-1 border-t border-border">
             {showLive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            {showLive ? "Hide" : "Show"} live progress
+            {showLive ? t("hide_live") : t("view_live")}
             {showLive ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
         </div>
@@ -676,7 +710,7 @@ function DebateBlock({ entry, idx }: { entry: DebateEntry; idx: number }) {
       {isRunning && !child && (
         <div className="border border-border rounded-xl p-4 flex items-center gap-3 bg-card">
           <Loader2 className="w-4 h-4 animate-spin text-muted-foreground flex-shrink-0" />
-          <p className="text-sm text-muted-foreground">Starting expert debate…</p>
+          <p className="text-sm text-muted-foreground">{t("launching_debate")}</p>
         </div>
       )}
 
@@ -685,18 +719,18 @@ function DebateBlock({ entry, idx }: { entry: DebateEntry; idx: number }) {
         <div className="border border-border rounded-xl overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            <span className="text-xs font-semibold text-foreground">Live — Expert debate in progress</span>
+            <span className="text-xs font-semibold text-foreground">{t("live_badge")}</span>
             {liveIters.length > 0 && <Badge variant="outline" className="text-xs py-0 ml-auto">{liveIters.length} round{liveIters.length !== 1 ? "s" : ""}</Badge>}
           </div>
           {liveIters.length === 0 ? (
             <div className="px-4 py-5 space-y-3">
               <div className="flex items-center gap-3">
                 <Loader2 className="w-4 h-4 animate-spin text-amber-500 flex-shrink-0" />
-                <p className="text-sm text-muted-foreground">Calling your expert team — first responses arriving shortly…</p>
+                <p className="text-sm text-muted-foreground">{t("calling_experts")}</p>
               </div>
             </div>
           ) : (
-            <div className="p-4"><LivePanel iters={liveIters} /></div>
+            <div className="p-4"><LivePanel iters={liveIters} phaseCfg={phaseCfg} /></div>
           )}
         </div>
       )}
@@ -707,10 +741,10 @@ function DebateBlock({ entry, idx }: { entry: DebateEntry; idx: number }) {
           {allIters.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground">Debate history</h3>
+                <h3 className="text-sm font-semibold text-foreground">{t("debate_history")}</h3>
                 <span className="text-xs text-muted-foreground">{allIters.length} rounds</span>
               </div>
-              {allIters.map((it, i) => <IterCard key={it.iteration} iter={it} idx={i} />)}
+              {allIters.map((it, i) => <IterCard key={it.iteration} iter={it} idx={i} phaseCfg={phaseCfg} />)}
             </div>
           )}
           <Results session={child} iterations={childIters} isQuick={false} />
@@ -721,7 +755,7 @@ function DebateBlock({ entry, idx }: { entry: DebateEntry; idx: number }) {
       {isError && (
         <div className="border border-destructive/30 bg-destructive/5 rounded-xl p-4 flex items-center gap-3">
           <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0" />
-          <p className="text-sm text-foreground">Debate failed. Check your API key and try again.</p>
+          <p className="text-sm text-foreground">{t("debate_failed_msg")}</p>
         </div>
       )}
     </div>
@@ -736,13 +770,16 @@ function FollowUpEntryCard({ entry, idx, onLaunchDebate, onCustomSetup, isLast, 
   isLast: boolean;
   debateLocked: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <div className="space-y-3 animate-fade-in-up">
       {/* Thread connector */}
       <div className="flex items-center gap-2 pl-1">
         <div className="w-px h-6 bg-border ml-3" />
         <CornerDownRight className="w-3.5 h-3.5 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">Follow-up {idx + 1}</span>
+        <span className="text-xs text-muted-foreground">
+          {t("followup_label_tmpl").replace("{n}", String(idx + 1))}
+        </span>
       </div>
       {/* Question */}
       <div className="bg-muted/40 border border-border rounded-lg px-4 py-3">
@@ -753,7 +790,7 @@ function FollowUpEntryCard({ entry, idx, onLaunchDebate, onCustomSetup, isLast, 
       <div className="border border-border rounded-xl overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/20">
           <Zap className="w-3.5 h-3.5 text-amber-500" />
-          <span className="text-xs font-semibold text-foreground">Quick answer</span>
+          <span className="text-xs font-semibold text-foreground">{t("quick_answer_complete")}</span>
         </div>
         <div className="px-4 py-4">
           <div className="mercury-prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(entry.answer) }} />
@@ -770,7 +807,7 @@ function FollowUpEntryCard({ entry, idx, onLaunchDebate, onCustomSetup, isLast, 
       {isLast && debateLocked && (
         <div className="flex items-center gap-2.5 px-1 py-1 text-xs text-muted-foreground">
           <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
-          Debate in progress — available once it completes.
+          {t("followup_debate_locked")}
         </div>
       )}
     </div>
@@ -779,6 +816,7 @@ function FollowUpEntryCard({ entry, idx, onLaunchDebate, onCustomSetup, isLast, 
 
 // ─── Follow-up input bar ──────────────────────────────────────
 function FollowUpBar({ onSubmit, isPending }: { onSubmit: (q: string) => void; isPending: boolean }) {
+  const { t } = useI18n();
   const [value, setValue] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -803,7 +841,7 @@ function FollowUpBar({ onSubmit, isPending }: { onSubmit: (q: string) => void; i
       <div className="border border-border rounded-xl overflow-hidden bg-card">
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/20">
           <CornerDownRight className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="text-xs font-semibold text-foreground">Ask a follow-up</span>
+          <span className="text-xs font-semibold text-foreground">{t("ask_followup")}</span>
           <span className="text-xs text-muted-foreground ml-1">— answer appears below, in this thread.</span>
         </div>
         <textarea
@@ -811,20 +849,20 @@ function FollowUpBar({ onSubmit, isPending }: { onSubmit: (q: string) => void; i
           value={value}
           onChange={e => setValue(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submit(); } }}
-          placeholder="Dig deeper, challenge the answer, or explore a related angle…"
+          placeholder={t("followup_placeholder")}
           className="w-full border-0 outline-none resize-none text-sm leading-relaxed bg-transparent px-4 pt-3 pb-2 text-foreground placeholder:text-muted-foreground min-h-[64px]"
           rows={2}
           data-testid="input-session-followup"
         />
         <div className="flex items-center justify-between px-4 py-3">
-          <span className="hidden sm:inline text-xs text-muted-foreground">⌘+Enter to send</span>
-          <span className="sm:hidden text-xs text-muted-foreground">Tap to send</span>
+          <span className="hidden sm:inline text-xs text-muted-foreground">{t("hint_desktop_session")}</span>
+          <span className="sm:hidden text-xs text-muted-foreground">{t("hint_mobile_session")}</span>
           <button
             onClick={submit}
             disabled={!value.trim() || isPending}
             className="inline-flex items-center gap-1.5 text-xs font-medium px-3 h-8 rounded-lg bg-foreground text-background hover:opacity-90 transition-opacity disabled:opacity-40"
           >
-            {isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Thinking…</> : <>Inquire <ArrowUp className="w-3.5 h-3.5" /></>}
+            {isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {t("followup_thinking")}</> : <>{t("followup_inquire")} <ArrowUp className="w-3.5 h-3.5" /></>}
           </button>
         </div>
       </div>
@@ -835,6 +873,8 @@ function FollowUpBar({ onSubmit, isPending }: { onSubmit: (q: string) => void; i
 
 // ─── Main session page ────────────────────────────────────────
 export default function SessionPage() {
+  const { t } = useI18n();
+  const phaseCfg = getPhaseCfg(t);
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -884,7 +924,7 @@ export default function SessionPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
       setShowWizard(false);
     },
-    onError: () => toast({ title: "Could not launch the debate.", variant: "destructive" }),
+    onError: () => toast({ title: t("toast_debate_launch_error"), variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -916,7 +956,7 @@ export default function SessionPage() {
     onMutate: (query) => { setPendingFollowUp(query); },
     onError: () => {
       setPendingFollowUp(null);
-      toast({ title: "Could not get a follow-up answer.", variant: "destructive" });
+      toast({ title: t("toast_followup_error"), variant: "destructive" });
     },
   });
 
@@ -959,9 +999,9 @@ export default function SessionPage() {
         }
         if (d.type === "followup_error") {
           setPendingFollowUp(null);
-          toast({ title: "Follow-up failed.", description: d.message, variant: "destructive" });
+          toast({ title: t("toast_followup_failed"), description: d.message, variant: "destructive" });
         }
-        if (d.type === "error") toast({ title: "Something went wrong during the inquiry.", description: d.message, variant: "destructive" });
+        if (d.type === "error") toast({ title: t("toast_something_wrong"), description: d.message, variant: "destructive" });
       } catch {}
     };
     return () => ws.close();
@@ -1032,8 +1072,8 @@ export default function SessionPage() {
     <Layout>
       <div className="h-full flex flex-col items-center justify-center gap-4 p-6">
         <AlertTriangle className="w-10 h-10 text-muted-foreground" />
-        <h2 className="font-semibold text-foreground">Inquiry not found</h2>
-        <Button variant="outline" onClick={() => navigate("/chat")}>Go back</Button>
+        <h2 className="font-semibold text-foreground">{t("inquiry_not_found")}</h2>
+        <Button variant="outline" onClick={() => navigate("/chat")}>{t("btn_go_back")}</Button>
       </div>
     </Layout>
   );
@@ -1086,7 +1126,7 @@ export default function SessionPage() {
                   <button
                     onClick={() => { setRenameVal(session.title); setRenaming(true); }}
                     className="p-1 rounded text-muted-foreground/0 group-hover:text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                    title="Rename"
+                    title={t("rename_placeholder")}
                   >
                     <Pencil className="w-3 h-3" />
                   </button>
@@ -1121,14 +1161,14 @@ export default function SessionPage() {
                   ? "text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent"
               )}
-              title={isPinned ? "Unpin" : "Pin to sidebar"}
+              title={isPinned ? t("unpin_title") : t("pin_title")}
             >
               {isPinned ? <Pin className="w-4 h-4 fill-current" /> : <PinOff className="w-4 h-4" />}
             </button>
 
             {/* Delete button */}
             <button data-testid="btn-delete"
-              onClick={() => confirm("Delete this inquiry?") && deleteMutation.mutate()}
+              onClick={() => confirm(t("btn_delete") + " " + t("inquiry_label_header") + "?") && deleteMutation.mutate()}
               className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0">
               <Trash2 className="w-4 h-4" />
             </button>
@@ -1136,7 +1176,7 @@ export default function SessionPage() {
 
           {/* Inquiry text */}
           <div className="bg-card border border-border rounded-lg px-4 py-3">
-            <p className="text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">Inquiry</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">{t("inquiry_label_header")}</p>
             <p className="text-sm text-foreground">{session.query}</p>
           </div>
 
@@ -1151,11 +1191,11 @@ export default function SessionPage() {
                 <span className="text-2xl font-bold text-foreground tabular-nums">{progress}%</span>
               </div>
               <Progress value={progress} className="h-1.5" />
-              <PhaseTimeline currentPhase={currentPhase} />
+              <PhaseTimeline currentPhase={currentPhase} phaseCfg={phaseCfg} />
               <button data-testid="btn-toggle-live" onClick={() => setShowLive(!showLive)}
                 className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors pt-1 border-t border-border">
                 {showLive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                {showLive ? "Hide" : "View"} live progress
+                {showLive ? t("hide_live") : t("view_live")}
                 {showLive ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
             </div>
@@ -1166,7 +1206,7 @@ export default function SessionPage() {
             <div className="border border-border rounded-xl overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                <span className="text-xs font-semibold text-foreground">Live — Expert debate in progress</span>
+                <span className="text-xs font-semibold text-foreground">{t("live_badge")}</span>
                 {liveIters.length > 0 && <Badge variant="outline" className="text-xs py-0 ml-auto">{liveIters.length} round{liveIters.length !== 1 ? "s" : ""} complete</Badge>}
               </div>
               {liveIters.length === 0 ? (
@@ -1176,8 +1216,8 @@ export default function SessionPage() {
                       <Loader2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 animate-spin" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-foreground">Inquiry launched.</p>
-                      <p className="text-xs text-muted-foreground">Calling your expert team — first responses arriving shortly…</p>
+                      <p className="text-sm font-medium text-foreground">{t("inquiry_launched")}</p>
+                      <p className="text-xs text-muted-foreground">{t("calling_experts")}</p>
                     </div>
                   </div>
                   <div className="ml-10 space-y-2">
@@ -1187,18 +1227,18 @@ export default function SessionPage() {
                         <div className="flex-1 h-2.5 skeleton rounded-full" style={{ width: `${75 - i * 12}%` }} />
                       </div>
                     ))}
-                    <p className="text-xs text-muted-foreground pt-1 pl-1">Phase 1 of 5 — Research</p>
+                    <p className="text-xs text-muted-foreground pt-1 pl-1">{t("phase_1_of_5")}</p>
                   </div>
                 </div>
               ) : (
-                <div className="p-4"><LivePanel iters={liveIters} /></div>
+                <div className="p-4"><LivePanel iters={liveIters} phaseCfg={phaseCfg} /></div>
               )}
             </div>
           )}
 
           {isRunning && !showLive && (
             <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" /> Expert panel is debating your inquiry…
+              <Loader2 className="w-4 h-4 animate-spin" /> {t("expert_debating")}
             </div>
           )}
 
@@ -1216,8 +1256,8 @@ export default function SessionPage() {
             <div className="border border-border rounded-xl overflow-hidden animate-fade-in-up">
               <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/20">
                 <Zap className="w-3.5 h-3.5 text-amber-500" />
-                <span className="text-xs font-semibold text-foreground">Initial answer</span>
-                {hasDebate && <span className="text-xs text-muted-foreground ml-1">— full expert debate below</span>}
+                <span className="text-xs font-semibold text-foreground">{t("initial_answer_header")}</span>
+                {hasDebate && <span className="text-xs text-muted-foreground ml-1">{t("full_debate_below")}</span>}
               </div>
               <div className="px-4 py-4">
                 <div className="mercury-prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(session.quickAnswer ?? "") }} />
@@ -1309,7 +1349,7 @@ export default function SessionPage() {
           {isCompleted && !pendingFollowUp && isAnyDebateRunning && (
             <div className="flex items-center gap-2.5 px-1 py-2 text-xs text-muted-foreground animate-fade-in-up">
               <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
-              Follow-up available once the debate completes.
+              {t("followup_available_after")}
             </div>
           )}
 

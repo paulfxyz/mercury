@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Plus, Trash2, Pencil, Star, StarOff, X, Search, Check, Loader2 } from "lucide-react";
 import type { Workflow } from "@shared/schema";
+import { useI18n } from "@/lib/i18n";
 
 interface ParsedStep { modelId: string; label: string; systemPrompt: string; }
 interface ModelOption { id: string; name: string; }
@@ -308,6 +309,7 @@ function WorkflowFormPanel({
 
 // ─── Workflows page ──────────────────────────────────────────
 export default function WorkflowsPage() {
+  const { t } = useI18n();
   const { toast } = useToast();
   const [panelOpen, setPanelOpen] = useState(false);
   const [editing, setEditing] = useState<Workflow | undefined>();
@@ -318,7 +320,7 @@ export default function WorkflowsPage() {
     mutationFn: (id: string) => apiRequest("DELETE", `/api/workflows/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/workflows"] });
-      toast({ title: "Workflow deleted.", description: "It has been permanently removed." });
+      toast({ title: t("toast_workflow_deleted"), description: "It has been permanently removed." });
     },
   });
 
@@ -341,9 +343,9 @@ export default function WorkflowsPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-base font-semibold text-foreground">Workflows</h1>
+                <h1 className="text-base font-semibold text-foreground">{t("workflows_title")}</h1>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Model sequences that research and debate your queries
+                  {t("workflows_sub")}
                 </p>
               </div>
               <Button
@@ -363,7 +365,7 @@ export default function WorkflowsPage() {
               </div>
             ) : workflows.length === 0 ? (
               <div className="border border-dashed border-border rounded-xl p-8 text-center">
-                <p className="text-sm text-muted-foreground mb-3">No workflows yet.</p>
+                <p className="text-sm text-muted-foreground mb-3">{t("no_workflows")}</p>
                 <Button size="sm" onClick={openNew}>Create your first workflow</Button>
               </div>
             ) : (
@@ -384,7 +386,7 @@ export default function WorkflowsPage() {
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-semibold text-foreground">{wf.name}</p>
                             {wf.isDefault === 1 && (
-                              <Badge variant="secondary" className="text-xs py-0">Default</Badge>
+                              <Badge variant="secondary" className="text-xs py-0">{t("workflow_default_badge")}</Badge>
                             )}
                           </div>
                           {wf.description && (
@@ -407,7 +409,7 @@ export default function WorkflowsPage() {
                             data-testid={`btn-default-${wf.id}`}
                             onClick={() => defaultMutation.mutate({ id: wf.id, isDefault: !wf.isDefault })}
                             className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                            title={wf.isDefault ? "Remove default" : "Set as default"}
+                            title={wf.isDefault ? "Remove default" : t("btn_set_default")}
                           >
                             {wf.isDefault
                               ? <Star className="w-4 h-4 fill-current" />
@@ -422,7 +424,7 @@ export default function WorkflowsPage() {
                           </button>
                           <button
                             data-testid={`btn-delete-${wf.id}`}
-                            onClick={() => confirm("Delete this workflow?") && deleteMutation.mutate(wf.id)}
+                            onClick={() => confirm(t("confirm_delete_workflow")) && deleteMutation.mutate(wf.id)}
                             className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />

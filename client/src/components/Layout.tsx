@@ -9,6 +9,7 @@ import {
   Plus, Clock, Menu, X, Pin,
 } from "lucide-react";
 import type { Session } from "@shared/schema";
+import { useI18n } from "@/lib/i18n";
 
 function MercuryLogo() {
   return (
@@ -20,6 +21,7 @@ function MercuryLogo() {
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const [location] = useLocation();
   const { theme, toggle } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -86,15 +88,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4 flex-shrink-0" />
-            New Inquiry
+            {t("sidebar_new_inquiry")}
           </button>
         </Link>
       </div>
 
       {/* Nav links */}
       <div className="px-2 space-y-0.5 flex-shrink-0">
-        {navLink("/workflows", <GitBranch className="w-4 h-4" />, "Workflows")}
-        {navLink("/settings", <Settings className="w-4 h-4" />, "Settings")}
+        {navLink("/workflows", <GitBranch className="w-4 h-4" />, t("sidebar_workflows"))}
+        {navLink("/settings", <Settings className="w-4 h-4" />, t("sidebar_settings"))}
       </div>
 
       {/* Sessions: pinned first, then recent */}
@@ -104,7 +106,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {/* Pinned */}
             {pinnedSessions.length > 0 && (
               <>
-                <p className="px-3 pb-1 pt-0.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Pinned</p>
+                <p className="px-3 pb-1 pt-0.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("sidebar_pinned")}</p>
                 {pinnedSessions.map(s => (
                   <Link key={s.id} href={`/session/${s.id}`}>
                     <button data-testid={`session-link-${s.id}`}
@@ -119,12 +121,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </Link>
                 ))}
                 {unpinnedSessions.length > 0 && (
-                  <p className="px-3 pb-1 pt-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Recent</p>
+                  <p className="px-3 pb-1 pt-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("sidebar_recent")}</p>
                 )}
               </>
             )}
             {pinnedSessions.length === 0 && (
-              <p className="px-3 pb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Recent</p>
+              <p className="px-3 pb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("sidebar_recent")}</p>
             )}
             {/* Unpinned recent */}
             {unpinnedSessions.map(s => (
@@ -141,6 +143,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* No sessions */}
+      {pinnedSessions.length === 0 && unpinnedSessions.length === 0 && (
+        <div className="px-5 py-3 mt-2">
+          <p className="text-xs text-muted-foreground">{t("sidebar_no_sessions")}</p>
         </div>
       )}
 

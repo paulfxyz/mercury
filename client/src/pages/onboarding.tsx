@@ -11,10 +11,12 @@ import {
   Eye, EyeOff, ArrowRight, ExternalLink,
   Server, Clock, Check,
 } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 type SaveMode = "server" | "session";
 
 export default function OnboardingPage() {
+  const { t } = useI18n();
   const [key, setKey] = useState("");
   const [label, setLabel] = useState("");
   const [show, setShow] = useState(false);
@@ -33,16 +35,16 @@ export default function OnboardingPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/onboarding"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/models"] });
-      toast({ title: "API key saved to the server.", description: "You now have access to 100+ models via OpenRouter." });
+      toast({ title: t("toast_key_saved_title"), description: t("toast_key_saved_desc") });
       navigate("/chat");
     },
-    onError: () => toast({ title: "Could not save your API key.", description: "Please check the key and try again.", variant: "destructive" }),
+    onError: () => toast({ title: t("toast_key_error_title"), description: t("toast_key_error_desc"), variant: "destructive" }),
   });
 
   function handleSessionOnly() {
     if (!key.trim()) return;
     setSessionKey(key.trim());
-    toast({ title: "Session key active.", description: "Your key is only kept in memory and will be cleared when you close this tab." });
+    toast({ title: t("toast_session_key_title"), description: t("toast_session_key_desc") });
     navigate("/chat");
   }
 
@@ -67,7 +69,7 @@ export default function OnboardingPage() {
             <div className="w-12 h-12 rounded-2xl bg-foreground flex items-center justify-center mb-5 text-background text-xl font-serif select-none">
               ☿
             </div>
-            <h1 className="text-xl font-semibold text-foreground mb-2">Welcome to Mercury</h1>
+            <h1 className="text-xl font-semibold text-foreground mb-2">{t("welcome_title")}</h1>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Mercury uses <strong className="text-foreground font-medium">OpenRouter</strong> to access 100+ AI models.
               Add your API key to get started.
@@ -77,12 +79,12 @@ export default function OnboardingPage() {
           {/* Key input */}
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">OpenRouter API Key</label>
+              <label className="text-sm font-medium text-foreground">{t("key_label")}</label>
               <div className="relative">
                 <Input
                   data-testid="input-api-key"
                   type={show ? "text" : "password"}
-                  placeholder="sk-or-v1-…"
+                  placeholder={t("key_placeholder")}
                   value={key}
                   onChange={e => setKey(e.target.value)}
                   onKeyDown={e => {
@@ -102,7 +104,7 @@ export default function OnboardingPage() {
                 </button>
               </div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                Get your free key at&nbsp;
+                {t("key_hint")}&nbsp;
                 <a
                   href="https://openrouter.ai/keys"
                   target="_blank"
@@ -118,10 +120,10 @@ export default function OnboardingPage() {
             {mode === "server" && (
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-foreground">
-                  Label <span className="text-muted-foreground font-normal">(optional)</span>
+                  {t("label_label")} <span className="text-muted-foreground font-normal">{t("label_optional")}</span>
                 </label>
                 <Input
-                  placeholder="e.g. Personal, Work, Free tier…"
+                  placeholder={t("label_placeholder")}
                   value={label}
                   onChange={e => setLabel(e.target.value)}
                   className="text-sm"
@@ -132,7 +134,7 @@ export default function OnboardingPage() {
 
           {/* Mode picker */}
           <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Where to save it</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("save_where")}</p>
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setMode("server")}
@@ -148,9 +150,9 @@ export default function OnboardingPage() {
                   {mode === "server" && <Check className="w-3.5 h-3.5 text-foreground" />}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Save to server</p>
+                  <p className="text-sm font-semibold text-foreground">{t("save_server_title")}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Stored securely on your server. Persists across sessions and devices.
+                    {t("save_server_desc")}
                   </p>
                 </div>
               </button>
@@ -169,9 +171,9 @@ export default function OnboardingPage() {
                   {mode === "session" && <Check className="w-3.5 h-3.5 text-foreground" />}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-foreground">This session only</p>
+                  <p className="text-sm font-semibold text-foreground">{t("save_session_title")}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Kept in memory only. Cleared when you close this tab. Never written to disk.
+                    {t("save_session_desc")}
                   </p>
                 </div>
               </button>
@@ -186,10 +188,10 @@ export default function OnboardingPage() {
             className="w-full"
           >
             {isPending
-              ? "Saving…"
+              ? t("btn_saving")
               : mode === "server"
-                ? "Save & get started"
-                : "Continue for this session"
+                ? t("btn_save_start")
+                : t("btn_continue_session")
             }
             {!isPending && <ArrowRight className="ml-2 w-4 h-4" />}
           </Button>
