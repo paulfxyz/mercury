@@ -12,6 +12,7 @@ import {
   Server, Clock, Check,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { useAppConfig } from "@/lib/config";
 
 type SaveMode = "server" | "session";
 
@@ -20,7 +21,10 @@ export default function OnboardingPage() {
   const [key, setKey] = useState("");
   const [label, setLabel] = useState("");
   const [show, setShow] = useState(false);
-  const [mode, setMode] = useState<SaveMode>("server");
+  const config = useAppConfig();
+  const demo = !!config?.demo;
+  const [chosenMode, setMode] = useState<SaveMode>("server");
+  const mode: SaveMode = demo ? "session" : chosenMode;
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const { setKey: setSessionKey } = useSessionKey();
@@ -71,8 +75,7 @@ export default function OnboardingPage() {
             </div>
             <h1 className="text-xl font-semibold text-foreground mb-2">{t("welcome_title")}</h1>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Mercury uses <strong className="text-foreground font-medium">OpenRouter</strong> to access 100+ AI models.
-              Add your API key to get started.
+              {t("onboarding_intro")}
             </p>
           </div>
 
@@ -132,8 +135,9 @@ export default function OnboardingPage() {
             )}
           </div>
 
-          {/* Mode picker */}
-          <div className="space-y-2">
+          {/* Mode picker (the public demo never stores keys on the server) */}
+          {demo && <p className="text-xs text-muted-foreground leading-relaxed">{t("demo_notice")}</p>}
+          {!demo && <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("save_where")}</p>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -178,7 +182,7 @@ export default function OnboardingPage() {
                 </div>
               </button>
             </div>
-          </div>
+          </div>}
 
           {/* CTA */}
           <Button

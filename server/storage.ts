@@ -76,6 +76,8 @@ for (const col of [
   "ALTER TABLE sessions ADD COLUMN parent_id TEXT;",
   "ALTER TABLE workflows ADD COLUMN temperature REAL NOT NULL DEFAULT 0.7;",
   "ALTER TABLE workflows ADD COLUMN consensus_threshold REAL NOT NULL DEFAULT 0.7;",
+  "ALTER TABLE sessions ADD COLUMN owner TEXT;",
+  "ALTER TABLE workflows ADD COLUMN owner TEXT;",
 ]) {
   try { sqlite.exec(col); } catch { /* already exists */ }
 }
@@ -84,10 +86,11 @@ for (const col of [
 export interface IStorage {
   createSession(data: InsertSession): Session;
   getSession(id: string): Session | undefined;
-  listSessions(): Session[];
+  /** Lists root sessions. When `owner` is given, only that visitor's sessions are returned. */
+  listSessions(owner?: string): Session[];
   updateSession(id: string, data: Partial<Session>): Session | undefined;
   deleteSession(id: string): void;
-  deleteAllSessions(): void;
+  deleteAllSessions(owner?: string): void;
   updateSessionTitle(id: string, title: string): Session | undefined;
   setPinned(id: string, pinned: boolean): Session | undefined;
   appendFollowUp(id: string, query: string, answer: string): Session | undefined;
@@ -101,7 +104,7 @@ export interface IStorage {
 
   createWorkflow(data: InsertWorkflow): Workflow;
   getWorkflow(id: string): Workflow | undefined;
-  listWorkflows(): Workflow[];
+  listWorkflows(owner?: string): Workflow[];
   updateWorkflow(id: string, data: Partial<Workflow>): Workflow | undefined;
   deleteWorkflow(id: string): void;
 
@@ -121,22 +124,36 @@ export const storage: IStorage = {
     return db.select().from(sessions).where(eq(sessions.id, s.id)).get()!;
   },
   getSession(id) { return db.select().from(sessions).where(eq(sessions.id, id)).get(); },
-  listSessions() {
+  listSessions(owner) {
     // Only return root sessions (no parentId) — child debate sessions stay hidden
     return db.select().from(sessions).orderBy(desc(sessions.createdAt)).all()
-      .filter(s => !(s as any).parentId);
+      .filter(s => !s.parentId && (owner === undefined || s.owner === owner));
   },
   updateSession(id, data) {
     db.update(sessions).set(data as any).where(eq(sessions.id, id)).run();
     return db.select().from(sessions).where(eq(sessions.id, id)).get();
   },
   deleteSession(id) {
+    // Child debate sessions belong to their parent and go with it.
+    const children = db.select().from(sessions).where(eq(sessions.parentId, id)).all();
+    for (const c of children) {
+      db.delete(iterations).where(eq(iterations.sessionId, c.id)).run();
+      db.delete(sessions).where(eq(sessions.id, c.id)).run();
+    }
     db.delete(iterations).where(eq(iterations.sessionId, id)).run();
     db.delete(sessions).where(eq(sessions.id, id)).run();
   },
-  deleteAllSessions() {
-    db.delete(iterations).run();
-    db.delete(sessions).run();
+  deleteAllSessions(owner) {
+    if (owner === undefined) {
+      db.delete(iterations).run();
+      db.delete(sessions).run();
+      return;
+    }
+    const mine = db.select().from(sessions).where(eq(sessions.owner, owner)).all();
+    for (const s of mine) {
+      db.delete(iterations).where(eq(iterations.sessionId, s.id)).run();
+      db.delete(sessions).where(eq(sessions.id, s.id)).run();
+    }
   },
   updateSessionTitle(id, title) {
     db.update(sessions).set({ title } as any).where(eq(sessions.id, id)).run();
@@ -181,7 +198,10 @@ export const storage: IStorage = {
     return db.select().from(workflows).where(eq(workflows.id, wf.id)).get()!;
   },
   getWorkflow(id) { return db.select().from(workflows).where(eq(workflows.id, id)).get(); },
-  listWorkflows() { return db.select().from(workflows).orderBy(desc(workflows.createdAt)).all(); },
+  listWorkflows(owner) {
+    return db.select().from(workflows).orderBy(desc(workflows.createdAt)).all()
+      .filter(w => owner === undefined || w.owner === owner);
+  },
   updateWorkflow(id, data) {
     db.update(workflows).set(data as any).where(eq(workflows.id, id)).run();
     return db.select().from(workflows).where(eq(workflows.id, id)).get();

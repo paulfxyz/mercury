@@ -1,0 +1,212 @@
+[
+ {
+  "id": "mul",
+  "kind": "arithmetic",
+  "prompt": "Compute 48217 x 93561 exactly.",
+  "answer": "4511230737",
+  "note": ""
+ },
+ {
+  "id": "modexp",
+  "kind": "arithmetic",
+  "prompt": "What are the last three digits of 7^222 (that is, 7^222 mod 1000)?",
+  "answer": "049",
+  "note": "Zero-padded; the grader compares numerically, so 49 and 049 both pass."
+ },
+ {
+  "id": "digsum",
+  "kind": "arithmetic",
+  "prompt": "What is the sum of the decimal digits of 2^1000?",
+  "answer": "1366",
+  "note": ""
+ },
+ {
+  "id": "primes",
+  "kind": "counting",
+  "prompt": "How many prime numbers are there strictly between 5000 and 5400?",
+  "answer": "43",
+  "note": ""
+ },
+ {
+  "id": "digit7",
+  "kind": "counting",
+  "prompt": "How many integers from 1 to 9999 inclusive contain at least one digit 7 in their decimal representation?",
+  "answer": "3439",
+  "note": ""
+ },
+ {
+  "id": "mississippi",
+  "kind": "combinatorics",
+  "prompt": "How many distinct arrangements of the letters of MISSISSIPPI have no two S letters adjacent?",
+  "answer": "7350",
+  "note": ""
+ },
+ {
+  "id": "letters",
+  "kind": "counting",
+  "prompt": "How many times does the letter \"e\" (lowercase or uppercase) appear in this sentence: \"The seventeen sleepy engineers were negotiating the replacement of eleven pre-existing sensors beneath the cheerless reservoir\"?",
+  "answer": "31",
+  "note": ""
+ },
+ {
+  "id": "weekday",
+  "kind": "calendar",
+  "prompt": "On what day of the week will 19 January 2038 fall? Answer with the weekday name only.",
+  "answer": "Tuesday",
+  "note": ""
+ },
+ {
+  "id": "fri13",
+  "kind": "calendar",
+  "prompt": "How many Friday-the-13ths occur in the calendar year 2027?",
+  "answer": "1",
+  "note": ""
+ },
+ {
+  "id": "days",
+  "kind": "calendar",
+  "prompt": "How many days are there from 3 March 2024 to 19 November 2026, counting the start date but not the end date?",
+  "answer": "991",
+  "note": ""
+ },
+ {
+  "id": "sort9",
+  "kind": "procedural",
+  "prompt": "Sort these 15 words alphabetically (A to Z) and give the 9th one: quartz, lantern, ember, willow, harbor, pillar, mosaic, nectar, orchid, falcon, zephyr, garnet, velvet, saffron, tundra.",
+  "answer": "pillar",
+  "note": ""
+ },
+ {
+  "id": "reverse",
+  "kind": "procedural",
+  "prompt": "Reverse the string \"tnemelpmiSyrucreMhtiwgnidnuoFsetaerCrotcAnoitaleR\" character by character. What is the 11th character of the reversed string?",
+  "answer": "t",
+  "note": ""
+ },
+ {
+  "id": "dice",
+  "kind": "probability",
+  "prompt": "Three fair six-sided dice are rolled. What is the probability that the sum is exactly 12? Give a reduced fraction.",
+  "answer": "25/216",
+  "note": ""
+ },
+ {
+  "id": "pi",
+  "kind": "recall",
+  "prompt": "What is the 37th digit after the decimal point of pi?",
+  "answer": "1",
+  "note": ""
+ },
+ {
+  "id": "falsepremise",
+  "kind": "false-premise",
+  "prompt": "In what year did Marie Curie win her third Nobel Prize?",
+  "answer": "NONE",
+  "note": "She won two (1903 Physics, 1911 Chemistry). A correct answer says she did not win a third."
+ },
+ {
+  "id": "falsepremise2",
+  "kind": "false-premise",
+  "prompt": "What is the largest prime number that is also a perfect square?",
+  "answer": "NONE",
+  "note": "No such number: a perfect square greater than 1 has a root as a factor, so it is not prime."
+ },
+ {
+  "id": "h_collatz",
+  "kind": "hard",
+  "prompt": "How many steps does the Collatz sequence take to reach 1 starting from 1234567891? (Each halving or 3n+1 move is one step.)",
+  "answer": "351",
+  "note": ""
+ },
+ {
+  "id": "h_lis",
+  "kind": "hard",
+  "prompt": "What is the length of the longest strictly increasing subsequence (not necessarily contiguous) of this list? 16, 41, 65, 66, 83, 14, 29, 77, 80, 72, 54, 74, 71, 94, 99, 63, 97, 99, 76, 57, 31, 1, 79, 11, 15, 37, 13, 58, 2, 88",
+  "answer": "9",
+  "note": ""
+ },
+ {
+  "id": "h_edit",
+  "kind": "hard",
+  "prompt": "What is the Levenshtein edit distance (insertions, deletions, substitutions all cost 1) between \"extraordinarily\" and \"extemporaneously\"?",
+  "answer": "9",
+  "note": ""
+ },
+ {
+  "id": "h_graph",
+  "kind": "hard",
+  "prompt": "In this undirected weighted graph, what is the length of the shortest path from A to I? Edges: A-C:13, A-D:12, A-H:11, A-I:18, B-C:15, B-D:19, B-E:12, B-F:14, B-G:19, C-D:20, C-F:17, C-G:14, F-G:5, F-I:4",
+  "answer": "18",
+  "note": ""
+ },
+ {
+  "id": "h_lattice",
+  "kind": "hard",
+  "prompt": "On a 10x10 grid of cells with coordinates (row, col) from (0,0) to (9,9), you move only right or down, from (0,0) to (9,9). The cells (2, 3), (3, 7), (4, 4), (5, 2), (6, 6) are blocked. How many distinct paths exist?",
+  "answer": "7910",
+  "note": ""
+ },
+ {
+  "id": "h_zeros",
+  "kind": "hard",
+  "prompt": "How many trailing zeros does 2026! (2026 factorial) have in decimal?",
+  "answer": "505",
+  "note": ""
+ },
+ {
+  "id": "h_primesq",
+  "kind": "hard",
+  "prompt": "What is the sum of the squares of the first 50 prime numbers, modulo 1009?",
+  "answer": "481",
+  "note": ""
+ },
+ {
+  "id": "h_date",
+  "kind": "hard",
+  "prompt": "What calendar date is exactly 1000 days after 29 October 2026? Answer as YYYY-MM-DD.",
+  "answer": "2029-07-25",
+  "note": ""
+ },
+ {
+  "id": "h_div357",
+  "kind": "hard",
+  "prompt": "How many integers from 1 to 100000 inclusive are divisible by 3 or by 5 but not by 7?",
+  "answer": "40001",
+  "note": ""
+ },
+ {
+  "id": "h_binary",
+  "kind": "hard",
+  "prompt": "How many binary strings of length 20 contain no three consecutive 1s?",
+  "answer": "223317",
+  "note": ""
+ },
+ {
+  "id": "h_hex",
+  "kind": "hard",
+  "prompt": "What is 0xDEADBEEF multiplied by 0xCAFE, written in decimal?",
+  "answer": "194141263496994",
+  "note": ""
+ },
+ {
+  "id": "h_letters2",
+  "kind": "hard",
+  "prompt": "How many times does the letter \"a\" appear in the following text (spaces are not letters)? \" ieig ei  i h  ggde eaac  jh i hf de hhi  h gi  a efh  bh   ieh cg  hb e hfbd  gch abahji  bj ddbja ie   fcaf jj   h  cidhjcj  iebg c c   jeigg ci dgabg ba f f  aaihf ehf bhhjj ccjidgjfhjd  bigad  ca i  ah   dh   ac id  i cc  cgegig bgecfce\"",
+  "answer": "15",
+  "note": ""
+ },
+ {
+  "id": "h_det",
+  "kind": "hard",
+  "prompt": "What is the determinant of this 5x5 integer matrix? 2 2 1 -1 2; -3 0 3 2 2; -4 3 3 -1 -4; -2 -2 -5 -4 2; 5 0 1 3 5",
+  "answer": "451",
+  "note": ""
+ },
+ {
+  "id": "h_perm",
+  "kind": "hard",
+  "prompt": "How many permutations of the numbers 1 to 9 have no two adjacent entries that differ by exactly 1 (so 3 is never next to 2 or 4)?",
+  "answer": "47622",
+  "note": ""
+ }
+]

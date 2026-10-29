@@ -96,6 +96,8 @@ That's it. Your app is at `https://your-app-name.fly.dev`.
 | `PORT` | `5000` | HTTP port to listen on |
 | `NODE_ENV` | — | Set to `production` for production mode |
 | `DB_PATH` | `mercury.db` | Path to SQLite database file |
+| `MERCURY_PASSWORD` | unset | If set, the app and its WebSocket require this password (HTTP Basic, any username) |
+| `MERCURY_DEMO` | unset | `1` for a public demo: no server-side keys, per-visitor data, request limits |
 
 ---
 
@@ -138,11 +140,30 @@ npm start    # or: flyctl deploy
 
 ---
 
+## Security notes
+
+- Mercury has no user accounts. If the instance is reachable from the internet, set `MERCURY_PASSWORD`, or run it behind your own authentication.
+- Keys saved with "Save on server" are stored in the SQLite file in plain text. Prefer "This session only" on shared or public instances, or set `MERCURY_DEMO=1`, which refuses to store keys.
+- In Fly.io, set the password as a secret rather than in `fly.toml`: `flyctl secrets set MERCURY_PASSWORD=...`.
+
+---
+
+## Checks
+
+```bash
+npm run check    # TypeScript
+npm test         # unit tests (phase planning, vote parsing)
+npm run build    # client and server bundles
+python3 benchmark/verify_models.py   # confirms the hard-coded model IDs exist on OpenRouter
+```
+
+---
+
 ## Getting an OpenRouter key
 
 1. Go to [openrouter.ai/keys](https://openrouter.ai/keys)
 2. Create a free account
 3. Generate a new API key
-4. Paste it into Mercury's onboarding screen or Settings → OpenRouter API Key
+4. Paste it into Mercury's onboarding screen or Settings
 
-The free tier gives you access to many models at no cost. Paid models bill per token at competitive rates.
+OpenRouter bills per token, at the price of the model you choose. Mercury shows no spend limit of its own, so set a credit limit on the key in OpenRouter.

@@ -74,7 +74,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <button
           onClick={() => setSidebarOpen(false)}
           className="md:hidden p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
-          aria-label="Close menu"
+          aria-label={t("menu_close")}
         >
           <X className="w-5 h-5" />
         </button>
@@ -202,7 +202,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <button
               onClick={() => setSidebarOpen(true)}
               className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
-              aria-label="Open menu"
+              aria-label={t("menu_open")}
             >
               <Menu className="w-5 h-5" />
             </button>

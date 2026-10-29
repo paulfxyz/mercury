@@ -19,6 +19,7 @@ export const sessions = sqliteTable("sessions", {
   followUps: text("follow_ups").notNull().default("[]"), // JSON: [{query, answer, createdAt}]
   debates: text("debates").notNull().default("[]"),     // JSON: [{sessionId, query, createdAt}]
   parentId: text("parent_id"),                           // set on child debate sessions, null on root sessions
+  owner: text("owner"),                                  // anonymous visitor id (used to scope data in demo mode)
   createdAt: integer("created_at").notNull(),
 });
 export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true, createdAt: true });
@@ -71,6 +72,7 @@ export const workflows = sqliteTable("workflows", {
   temperature: real("temperature").notNull().default(0.7),
   consensusThreshold: real("consensus_threshold").notNull().default(0.7), // 0-1
   isDefault: integer("is_default").notNull().default(0),
+  owner: text("owner"),
   createdAt: integer("created_at").notNull(),
 });
 export const insertWorkflowSchema = createInsertSchema(workflows).omit({ id: true, createdAt: true });

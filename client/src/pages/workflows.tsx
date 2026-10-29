@@ -21,13 +21,14 @@ function parseSteps(raw: string): ParsedStep[] {
 
 // ─── Model search — plain inline dropdown, no portal, no Radix ───
 function ModelSearch({
-  models, loading, onSelect, placeholder = "Search and add a model…"
+  models, loading, onSelect, placeholder
 }: {
   models: ModelOption[];
   loading: boolean;
   onSelect: (m: ModelOption) => void;
   placeholder?: string;
 }) {
+  const { t } = useI18n();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -56,7 +57,7 @@ function ModelSearch({
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
         <Input
           className="pl-9 text-sm"
-          placeholder={placeholder}
+          placeholder={placeholder ?? t("model_search_add_placeholder")}
           value={q}
           onChange={e => { setQ(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
@@ -64,10 +65,10 @@ function ModelSearch({
       </div>
       {open && (
         <div className="absolute top-full left-0 right-0 mt-1 border border-border rounded-lg bg-background shadow-xl max-h-52 overflow-y-auto z-50">
-          {loading && <div className="px-3 py-2 text-xs text-muted-foreground">Loading models…</div>}
+          {loading && <div className="px-3 py-2 text-xs text-muted-foreground">{t("model_loading")}</div>}
           {!loading && filtered.length === 0 && (
             <div className="px-3 py-2 text-xs text-muted-foreground">
-              {q ? `No models matching "${q}"` : "Start typing to search models…"}
+              {q ? `${t("model_no_results")} "${q}"` : t("model_start_typing")}
             </div>
           )}
           {filtered.map(m => (
@@ -89,6 +90,7 @@ function ModelSearch({
 
 // ─── Step builder ────────────────────────────────────────────
 function StepBuilder({ steps, onChange }: { steps: ParsedStep[]; onChange: (s: ParsedStep[]) => void; }) {
+  const { t } = useI18n();
   const { data: models = [], isLoading } = useQuery<ModelOption[]>({
     queryKey: ["/api/models"],
     staleTime: 60_000,
@@ -106,7 +108,7 @@ function StepBuilder({ steps, onChange }: { steps: ParsedStep[]; onChange: (s: P
     <div className="space-y-2">
       {steps.length === 0 && (
         <div className="border border-dashed border-border rounded-lg p-4 text-center">
-          <p className="text-xs text-muted-foreground">No models yet. Search below to add your first expert.</p>
+          <p className="text-xs text-muted-foreground">{t("wf_no_models")}</p>
         </div>
       )}
 
@@ -130,7 +132,7 @@ function StepBuilder({ steps, onChange }: { steps: ParsedStep[]; onChange: (s: P
           </div>
           <div className="px-3 pb-2.5 pt-2 border-t border-border/50">
             <Textarea
-              placeholder={`Custom role for ${step.label.split(" ")[0]}… e.g. "You are a devil's advocate. Challenge every assumption."`}
+              placeholder={t("wf_role_placeholder_tmpl").replace("{name}", step.label.split(" ")[0])}
               value={step.systemPrompt}
               onChange={e => updatePrompt(i, e.target.value)}
               className="text-xs resize-none bg-transparent border-0 shadow-none focus-visible:ring-0 p-0 placeholder:text-muted-foreground/60 min-h-[2rem]"
@@ -154,6 +156,7 @@ function WorkflowFormPanel({
   onSaved: () => void;
 }) {
   const { toast } = useToast();
+  const { t } = useI18n();
   const [name, setName] = useState(existing?.name ?? "");
   const [desc, setDesc] = useState(existing?.description ?? "");
   const [iters, setIters] = useState(existing?.iterations ?? 15);
@@ -173,16 +176,14 @@ function WorkflowFormPanel({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/workflows"] });
       toast({
-        title: existing ? "Workflow updated successfully." : "Workflow created successfully.",
-        description: existing
-          ? "Your changes have been saved."
-          : "It is ready to use in your next inquiry.",
+        title: existing ? t("wf_updated_title") : t("wf_created_title"),
+        description: existing ? t("wf_updated_desc") : t("wf_created_desc"),
       });
       onSaved();
     },
     onError: () => toast({
-      title: "Could not save the workflow.",
-      description: "Please check your inputs and try again.",
+      title: t("toast_workflow_error"),
+      description: t("wf_save_error_desc"),
       variant: "destructive",
     }),
   });
@@ -193,9 +194,9 @@ function WorkflowFormPanel({
       <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
         <div>
           <h2 className="text-sm font-semibold text-foreground">
-            {existing ? "Edit workflow" : "New workflow"}
+            {existing ? t("wf_edit") : t("wf_new")}
           </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Configure model steps and debate settings</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{t("wf_configure_sub")}</p>
         </div>
         <button
           type="button"
@@ -210,11 +211,11 @@ function WorkflowFormPanel({
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
         {/* Name */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-foreground">Name</label>
+          <label className="text-xs font-medium text-foreground">{t("wf_name")}</label>
           <Input
             value={name}
             onChange={e => setName(e.target.value)}
-            placeholder="e.g. Deep Research"
+            placeholder={t("wf_name_placeholder")}
             data-testid="input-workflow-name"
           />
         </div>
@@ -222,12 +223,12 @@ function WorkflowFormPanel({
         {/* Description */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-foreground">
-            Description <span className="text-muted-foreground font-normal">(optional)</span>
+            {t("wf_description")} <span className="text-muted-foreground font-normal">{t("label_optional")}</span>
           </label>
           <Input
             value={desc}
             onChange={e => setDesc(e.target.value)}
-            placeholder="What is this workflow for?"
+            placeholder={t("wf_desc_placeholder")}
             data-testid="input-workflow-desc"
           />
         </div>
@@ -236,7 +237,7 @@ function WorkflowFormPanel({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-foreground">Rounds</label>
+              <label className="text-xs font-medium text-foreground">{t("wf_rounds")}</label>
               <span className="text-xs font-mono text-foreground">{iters}</span>
             </div>
             <input
@@ -250,7 +251,7 @@ function WorkflowFormPanel({
           </div>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-foreground">Temperature</label>
+              <label className="text-xs font-medium text-foreground">{t("wf_temperature")}</label>
               <span className="text-xs font-mono text-foreground">{temp.toFixed(1)}</span>
             </div>
             <input
@@ -264,7 +265,7 @@ function WorkflowFormPanel({
           </div>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-foreground">Consensus</label>
+              <label className="text-xs font-medium text-foreground">{t("wf_consensus")}</label>
               <span className="text-xs font-mono text-foreground">{Math.round(threshold * 100)}%</span>
             </div>
             <input
@@ -280,15 +281,15 @@ function WorkflowFormPanel({
 
         {/* Model steps */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-foreground">Model steps</label>
-          <p className="text-xs text-muted-foreground">Each model is one expert in the debate. Add a custom role to shape its perspective.</p>
+          <label className="text-xs font-medium text-foreground">{t("wf_model_steps")}</label>
+          <p className="text-xs text-muted-foreground">{t("wf_model_steps_hint")}</p>
           <StepBuilder steps={steps} onChange={setSteps} />
         </div>
       </div>
 
       {/* Footer */}
       <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border flex-shrink-0">
-        <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+        <Button variant="outline" size="sm" onClick={onClose}>{t("btn_cancel")}</Button>
         <Button
           size="sm"
           data-testid="btn-save-workflow"
@@ -297,9 +298,9 @@ function WorkflowFormPanel({
           className="gap-1.5"
         >
           {mutation.isPending ? (
-            <><Loader2 className="w-3.5 h-3.5 animate-spin" />Saving…</>
+            <><Loader2 className="w-3.5 h-3.5 animate-spin" />{t("btn_saving")}</>
           ) : (
-            <><Check className="w-3.5 h-3.5" />Save workflow</>
+            <><Check className="w-3.5 h-3.5" />{t("wf_save")}</>
           )}
         </Button>
       </div>
@@ -320,7 +321,7 @@ export default function WorkflowsPage() {
     mutationFn: (id: string) => apiRequest("DELETE", `/api/workflows/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/workflows"] });
-      toast({ title: t("toast_workflow_deleted"), description: "It has been permanently removed." });
+      toast({ title: t("toast_workflow_deleted"), description: t("wf_deleted_desc") });
     },
   });
 
@@ -366,7 +367,7 @@ export default function WorkflowsPage() {
             ) : workflows.length === 0 ? (
               <div className="border border-dashed border-border rounded-xl p-8 text-center">
                 <p className="text-sm text-muted-foreground mb-3">{t("no_workflows")}</p>
-                <Button size="sm" onClick={openNew}>Create your first workflow</Button>
+                <Button size="sm" onClick={openNew}>{t("wf_create_first")}</Button>
               </div>
             ) : (
               <div className="space-y-3">
@@ -400,7 +401,7 @@ export default function WorkflowsPage() {
                             ))}
                           </div>
                           <p className="text-xs text-muted-foreground mt-2">
-                            {steps.length} model{steps.length !== 1 ? "s" : ""} · {wf.iterations} rounds
+                            {t("count_models_tmpl").replace("{n}", String(steps.length))} · {t("count_rounds_tmpl").replace("{n}", String(wf.iterations))}
                           </p>
                         </div>
 
@@ -409,7 +410,7 @@ export default function WorkflowsPage() {
                             data-testid={`btn-default-${wf.id}`}
                             onClick={() => defaultMutation.mutate({ id: wf.id, isDefault: !wf.isDefault })}
                             className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                            title={wf.isDefault ? "Remove default" : t("btn_set_default")}
+                            title={wf.isDefault ? t("wf_remove_default") : t("btn_set_default")}
                           >
                             {wf.isDefault
                               ? <Star className="w-4 h-4 fill-current" />

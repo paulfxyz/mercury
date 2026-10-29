@@ -20,8 +20,12 @@ import {
 import type { Session, Iteration, Workflow } from "@shared/schema";
 import { useI18n } from "@/lib/i18n";
 import type { TranslationKey } from "@/lib/i18n";
+import { QUICK_PANEL, QUICK_ROUNDS, QUICK_TEMPERATURE as QUICK_TEMP, QUICK_THRESHOLD } from "@shared/defaults";
+import { SUGGESTED_PANELS } from "@/lib/models";
+import { useAppConfig } from "@/lib/config";
 
-interface LiveResponse { modelId: string; modelName: string; content: string; }
+interface LiveResponse { modelId: string; modelName: string; content: string; failed?: boolean; }
+const isFailed = (r: LiveResponse) => !!r.failed || r.content.startsWith("[Error:");
 interface LiveIteration {
   iteration: number;
   phase: string;
@@ -36,11 +40,8 @@ interface ModelOption { id: string; name: string; }
 interface WizardStep { modelId: string; label: string; systemPrompt: string; }
 function parseWizardSteps(raw: string): WizardStep[] { try { return JSON.parse(raw); } catch { return []; } }
 
-// Quick-debate defaults (mirrors chat.tsx)
-const QUICK_MODELS = ["openai/gpt-4o", "anthropic/claude-3.5-sonnet", "google/gemini-2.0-flash-001"];
-const QUICK_ROUNDS = 3;
-const QUICK_TEMP = 0.3;
-const QUICK_THRESHOLD = 0.7;
+const QUICK_MODELS = QUICK_PANEL.map(p => p.id);
+type LaunchCfg = { selectedModels: string[]; roles?: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string };
 
 function getPhaseCfg(t: (k: TranslationKey) => string): Record<string, { icon: React.ElementType; label: string; color: string; bg: string }> {
   return {
@@ -116,9 +117,10 @@ function renderMarkdown(md: string): string {
 
 // ─── Phase timeline ──────────────────────────────────────────
 // ─── Model search ────────────────────────────────────────────────
-function ModelSearch({ models, loading, onSelect, placeholder = "Search models…" }: {
+function ModelSearch({ models, loading, onSelect, placeholder }: {
   models: ModelOption[]; loading: boolean; onSelect: (m: ModelOption) => void; placeholder?: string;
 }) {
+  const { t } = useI18n();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -132,13 +134,13 @@ function ModelSearch({ models, loading, onSelect, placeholder = "Search models�
     <div ref={ref} className="relative">
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-        <Input className="pl-9 text-sm" placeholder={placeholder} value={q}
+        <Input className="pl-9 text-sm" placeholder={placeholder ?? t("search_models")} value={q}
           onChange={e => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} />
       </div>
       {open && (
         <div className="absolute top-full left-0 right-0 mt-1 border border-border rounded-xl bg-background shadow-2xl z-50 max-h-64 overflow-y-auto">
-          {loading && <div className="px-4 py-3 text-xs text-muted-foreground">Loading models…</div>}
-          {!loading && filtered.length === 0 && <div className="px-4 py-3 text-xs text-muted-foreground">{q ? `No models found for "${q}"` : "Start typing…"}</div>}
+          {loading && <div className="px-4 py-3 text-xs text-muted-foreground">{t("model_loading")}</div>}
+          {!loading && filtered.length === 0 && <div className="px-4 py-3 text-xs text-muted-foreground">{q ? `${t("model_no_results")} "${q}"` : t("model_start_typing")}</div>}
           {filtered.map(m => (
             <button key={m.id} onMouseDown={e => { e.preventDefault(); onSelect(m); setQ(""); setOpen(false); }}
               className="w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b border-border/40 last:border-0">
@@ -155,7 +157,7 @@ function ModelSearch({ models, loading, onSelect, placeholder = "Search models�
 // ─── Debate starter ───────────────────────────────────────────
 function DebateStarter({ query, onLaunchDebate, onCustomSetup }: {
   query: string;
-  onLaunchDebate: (cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string }) => void;
+  onLaunchDebate: (cfg: LaunchCfg) => void;
   onCustomSetup: () => void;
 }) {
   const { t } = useI18n();
@@ -182,7 +184,7 @@ function DebateStarter({ query, onLaunchDebate, onCustomSetup }: {
             {t("quick_debate_desc_tmpl").replace("{rounds}", String(QUICK_ROUNDS)).replace("{temp}", String(QUICK_TEMP))}
           </p>
           <div className="flex flex-wrap gap-1 mt-2">
-            {["GPT-4o", "Claude 3.5", "Gemini 2.0"].map(l => <span key={l} className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-medium">{l}</span>)}
+            {QUICK_PANEL.map(p => p.label).map(l => <span key={l} className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-medium">{l}</span>)}
           </div>
         </div>
         {launching ? <Loader2 className="w-4 h-4 text-muted-foreground animate-spin flex-shrink-0 mt-1" /> : <ChevronDown className="w-4 h-4 -rotate-90 text-muted-foreground group-hover:text-foreground flex-shrink-0 mt-1 transition-colors" />}
@@ -192,7 +194,7 @@ function DebateStarter({ query, onLaunchDebate, onCustomSetup }: {
           {workflows.map(wf => {
             const wfSteps = parseWizardSteps(wf.steps);
             return (
-              <button key={wf.id} onClick={() => launch({ selectedModels: wfSteps.map(s => s.modelId), iterations: wf.iterations, temperature: wf.temperature ?? 0.7, consensusThreshold: wf.consensusThreshold ?? 0.7, workflowId: wf.id })}
+              <button key={wf.id} onClick={() => launch({ selectedModels: wfSteps.map(s => s.modelId), roles: wfSteps.map(s => s.systemPrompt ?? ""), iterations: wf.iterations, temperature: wf.temperature ?? 0.7, consensusThreshold: wf.consensusThreshold ?? 0.7, workflowId: wf.id })}
                 disabled={launching}
                 className={cn("w-full text-left p-3.5 rounded-xl border border-border hover:border-foreground/30 hover:bg-accent/20 transition-all group flex items-center gap-3", launching && "opacity-50 cursor-not-allowed")}>
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
@@ -200,7 +202,7 @@ function DebateStarter({ query, onLaunchDebate, onCustomSetup }: {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">{wf.name}</p>
-                  <p className="text-xs text-muted-foreground">{wfSteps.length} model{wfSteps.length !== 1 ? "s" : ""} · {wf.iterations} rounds</p>
+                  <p className="text-xs text-muted-foreground">{t("count_models_tmpl").replace("{n}", String(wfSteps.length))} · {t("count_rounds_tmpl").replace("{n}", String(wf.iterations))}</p>
                 </div>
                 <ChevronDown className="w-4 h-4 -rotate-90 text-muted-foreground group-hover:text-foreground flex-shrink-0 transition-colors" />
               </button>
@@ -226,7 +228,7 @@ function DebateStarter({ query, onLaunchDebate, onCustomSetup }: {
 // ─── Inquiry wizard (split-panel) ─────────────────────────────
 function InquiryWizard({ query, onClose, onLaunch }: {
   query: string; onClose: () => void;
-  onLaunch: (cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string }) => void;
+  onLaunch: (cfg: LaunchCfg) => void;
 }) {
   const { t } = useI18n();
   const { data: workflows = [] } = useQuery<Workflow[]>({ queryKey: ["/api/workflows"] });
@@ -235,7 +237,11 @@ function InquiryWizard({ query, onClose, onLaunch }: {
   const [step, setStep] = useState(1);
   const [teamSize, setTeamSize] = useState(3);
   const [wSteps, setWSteps] = useState<WizardStep[]>([]);
-  const [rounds, setRounds] = useState(15);
+  const config = useAppConfig();
+  const maxRounds = config?.limits.maxRounds ?? 30;
+  const maxModels = config?.limits.maxModels ?? 12;
+  const [roundsRaw, setRounds] = useState(15);
+  const rounds = Math.min(roundsRaw, maxRounds);
   const [temperature, setTemperature] = useState(0.7);
   const [threshold, setThreshold] = useState(0.7);
   const [wantToSave, setWantToSave] = useState(false);
@@ -245,6 +251,12 @@ function InquiryWizard({ query, onClose, onLaunch }: {
   useEffect(() => { bodyRef.current?.scrollTo(0, 0); }, [step]);
 
   function addModel(m: ModelOption) { if (wSteps.length < teamSize) setWSteps(prev => [...prev, { modelId: m.id, label: m.name, systemPrompt: "" }]); }
+  function applyPanel(ids: string[]) {
+    const available = models.length > 0 ? ids.filter(id => models.some(m => m.id === id)) : ids;
+    if (available.length < 2) return;
+    setTeamSize(available.length);
+    setWSteps(available.map(id => ({ modelId: id, label: models.find(m => m.id === id)?.name ?? id.split("/").pop() ?? id, systemPrompt: "" })));
+  }
   function removeModel(i: number) { setWSteps(prev => prev.filter((_, j) => j !== i)); }
   function updatePrompt(i: number, v: string) { setWSteps(prev => prev.map((s, j) => j === i ? { ...s, systemPrompt: v } : s)); }
 
@@ -261,7 +273,7 @@ function InquiryWizard({ query, onClose, onLaunch }: {
       } catch { toast({ title: t("toast_workflow_error"), description: t("toast_workflow_error_desc"), variant: "destructive" }); }
       setSaving(false);
     }
-    onLaunch({ selectedModels: wSteps.map(s => s.modelId), iterations: rounds, temperature, consensusThreshold: threshold, workflowId });
+    onLaunch({ selectedModels: wSteps.map(s => s.modelId), roles: wSteps.map(s => s.systemPrompt), iterations: rounds, temperature, consensusThreshold: threshold, workflowId });
   }
 
   const WSTEPS = [
@@ -304,7 +316,7 @@ function InquiryWizard({ query, onClose, onLaunch }: {
           <div className="space-y-4">
             <p className="text-sm font-medium text-foreground">{t("wizard_how_many")}</p>
             <div className="grid grid-cols-4 gap-2">
-              {[2,3,4,5,6,8,10,12].map(n => (
+              {[2,3,4,5,6,8,10,12].filter(n => n <= maxModels).map(n => (
                 <button key={n} onClick={() => setTeamSize(n)} className={cn("py-3 rounded-xl border text-sm font-semibold transition-all",
                   teamSize === n ? "bg-foreground text-background border-foreground" : "border-border text-foreground hover:border-foreground/40")}>{n}</button>
               ))}
@@ -315,8 +327,19 @@ function InquiryWizard({ query, onClose, onLaunch }: {
         {step === 2 && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-foreground">Select {teamSize} model{teamSize !== 1 ? "s" : ""}</p>
+              <p className="text-sm font-medium text-foreground">{t("wizard_select_models_tmpl").replace("{n}", String(teamSize))}</p>
               <span className="text-xs text-muted-foreground tabular-nums">{wSteps.length} / {teamSize}</span>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("panels_label")}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {SUGGESTED_PANELS.map(panel => (
+                  <button key={panel.id} onClick={() => applyPanel(panel.models)}
+                    className="text-xs px-2.5 py-1.5 rounded-lg border border-border text-foreground hover:border-foreground/40 hover:bg-accent/30 transition-colors">
+                    {t(panel.nameKey)}
+                  </button>
+                ))}
+              </div>
             </div>
             <ModelSearch models={models} loading={modelsLoading} onSelect={addModel}
               placeholder={wSteps.length < teamSize
@@ -349,7 +372,7 @@ function InquiryWizard({ query, onClose, onLaunch }: {
                 <p className="text-sm font-medium text-foreground">{t("wizard_rounds_label")}</p>
                 <span className="text-sm font-mono font-bold text-foreground">{rounds}</span>
               </div>
-              <input type="range" min={5} max={30} value={rounds} onChange={e => setRounds(+e.target.value)} className="w-full accent-foreground" />
+              <input type="range" min={Math.min(5, maxRounds)} max={maxRounds} value={rounds} onChange={e => setRounds(+e.target.value)} className="w-full accent-foreground" />
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>{t("rounds_quick")}</span><span>{t("rounds_balanced")}</span><span>{t("rounds_deep")}</span>
               </div>
@@ -445,6 +468,7 @@ function PhaseTimeline({ currentPhase, phaseCfg }: { currentPhase: string; phase
 
 // ─── Live response stream ─────────────────────────────────────
 function LivePanel({ iters, phaseCfg }: { iters: LiveIteration[]; phaseCfg: ReturnType<typeof getPhaseCfg> }) {
+  const { t } = useI18n();
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [iters.length]);
   return (
@@ -459,13 +483,13 @@ function LivePanel({ iters, phaseCfg }: { iters: LiveIteration[]; phaseCfg: Retu
               <div className={cn("w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0", cfg.bg)}>
                 <Icon className={cn("w-2.5 h-2.5", cfg.color)} />
               </div>
-              <span className="text-xs font-semibold text-foreground">Round {iter.iteration} — {cfg.label}</span>
-              {pct !== null && <Badge variant="outline" className="text-xs py-0 ml-auto">{pct}% consensus</Badge>}
+              <span className="text-xs font-semibold text-foreground">{t("round_n_tmpl").replace("{n}", String(iter.iteration))} — {cfg.label}</span>
+              {pct !== null && <Badge variant="outline" className="text-xs py-0 ml-auto">{t("consensus_pct_tmpl").replace("{pct}", String(pct))}</Badge>}
             </div>
             {iter.responses.map((r, i) => (
               <div key={i} className={cn(
                 "ml-6 mb-1.5 px-3 py-2 rounded-lg text-xs border",
-                r.content.startsWith("[Error:") ? "border-destructive/30 bg-destructive/5" : "border-border bg-card"
+                isFailed(r) ? "border-destructive/30 bg-destructive/5" : "border-border bg-card"
               )}>
                 <p className="font-medium text-foreground mb-1">{r.modelName}</p>
                 <p className="text-muted-foreground leading-relaxed">{r.content.slice(0, 280)}{r.content.length > 280 ? "…" : ""}</p>
@@ -481,6 +505,7 @@ function LivePanel({ iters, phaseCfg }: { iters: LiveIteration[]; phaseCfg: Retu
 
 // ─── Iteration accordion ──────────────────────────────────────
 function IterCard({ iter, idx, phaseCfg }: { iter: LiveIteration; idx: number; phaseCfg: ReturnType<typeof getPhaseCfg> }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const cfg = phaseCfg[iter.phase] ?? phaseCfg.research;
   const Icon = cfg.icon;
@@ -492,12 +517,11 @@ function IterCard({ iter, idx, phaseCfg }: { iter: LiveIteration; idx: number; p
           <Icon className={cn("w-3.5 h-3.5", cfg.color)} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground">Round {iter.iteration} — {cfg.label}</p>
-          {iter.summary && <p className="text-xs text-muted-foreground truncate mt-0.5">{iter.summary}</p>}
+          <p className="text-sm font-medium text-foreground">{t("round_n_tmpl").replace("{n}", String(iter.iteration))} — {cfg.label}</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {pct !== null && <span className="text-xs font-semibold text-green-600 dark:text-green-400">{pct}%</span>}
-          <span className="text-xs text-muted-foreground">{iter.responses.length} models</span>
+          <span className="text-xs text-muted-foreground">{t("count_models_tmpl").replace("{n}", String(iter.responses.length))}</span>
           {open ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
         </div>
       </button>
@@ -522,7 +546,8 @@ function Results({ session, iterations, isQuick }: { session: Session; iteration
   const { toast } = useToast();
   const finalAnswer = session.finalAnswer ?? session.quickAnswer ?? "";
   const lastIter = iterations[iterations.length - 1];
-  const consensus = lastIter?.consensus ? Math.round(lastIter.consensus * 100) : null;
+  const votedIter = [...iterations].reverse().find(it => it.consensus);
+  const consensus = votedIter?.consensus ? Math.round(votedIter.consensus * 100) : null;
   const allModels: string[] = [];
   for (const it of iterations) {
     try {
@@ -538,7 +563,7 @@ function Results({ session, iterations, isQuick }: { session: Session; iteration
       await navigator.clipboard.writeText(finalAnswer);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch { toast({ title: "Could not copy to clipboard.", description: "Please try selecting and copying the text manually.", variant: "destructive" }); }
+    } catch { toast({ title: t("toast_copy_error_title"), description: t("toast_copy_error_desc"), variant: "destructive" }); }
   }
 
   function download() {
@@ -565,13 +590,13 @@ function Results({ session, iterations, isQuick }: { session: Session; iteration
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground">{isQuick ? t("quick_answer_complete") : t("inquiry_complete")}</p>
             <p className="text-xs text-muted-foreground">
-              {isQuick ? "Single model · instant response" : `${iterations.length} rounds · ${allModels.length} expert${allModels.length !== 1 ? "s" : ""}`}
+              {isQuick ? t("quick_single_desc") : `${t("count_rounds_tmpl").replace("{n}", String(iterations.length))} · ${t("count_experts_tmpl").replace("{n}", String(allModels.length))}`}
             </p>
           </div>
           {!isQuick && consensus !== null && (
             <div className="text-right flex-shrink-0">
               <p className="text-2xl font-bold text-green-600 dark:text-green-400 leading-none">{consensus}%</p>
-              <p className="text-xs text-muted-foreground">consensus</p>
+              <p className="text-xs text-muted-foreground">{t("consensus_word")}</p>
             </div>
           )}
         </div>
@@ -690,7 +715,7 @@ function DebateBlock({ entry, idx }: { entry: DebateEntry; idx: number }) {
         <div className="border border-border rounded-xl p-4 space-y-4 bg-card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-semibold text-foreground">Round {child.currentIteration} of {child.totalIterations}</p>
+              <p className="text-sm font-semibold text-foreground">{t("round_of_tmpl").replace("{n}", String(child.currentIteration)).replace("{total}", String(child.totalIterations))}</p>
               <p className="text-xs text-muted-foreground capitalize">{currentPhase} phase</p>
             </div>
             <span className="text-2xl font-bold text-foreground tabular-nums">{progress}%</span>
@@ -720,7 +745,7 @@ function DebateBlock({ entry, idx }: { entry: DebateEntry; idx: number }) {
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
             <span className="text-xs font-semibold text-foreground">{t("live_badge")}</span>
-            {liveIters.length > 0 && <Badge variant="outline" className="text-xs py-0 ml-auto">{liveIters.length} round{liveIters.length !== 1 ? "s" : ""}</Badge>}
+            {liveIters.length > 0 && <Badge variant="outline" className="text-xs py-0 ml-auto">{t("count_rounds_tmpl").replace("{n}", String(liveIters.length))}</Badge>}
           </div>
           {liveIters.length === 0 ? (
             <div className="px-4 py-5 space-y-3">
@@ -742,7 +767,7 @@ function DebateBlock({ entry, idx }: { entry: DebateEntry; idx: number }) {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-foreground">{t("debate_history")}</h3>
-                <span className="text-xs text-muted-foreground">{allIters.length} rounds</span>
+                <span className="text-xs text-muted-foreground">{t("count_rounds_tmpl").replace("{n}", String(allIters.length))}</span>
               </div>
               {allIters.map((it, i) => <IterCard key={it.iteration} iter={it} idx={i} phaseCfg={phaseCfg} />)}
             </div>
@@ -765,7 +790,7 @@ function DebateBlock({ entry, idx }: { entry: DebateEntry; idx: number }) {
 function FollowUpEntryCard({ entry, idx, onLaunchDebate, onCustomSetup, isLast, debateLocked }: {
   entry: FollowUpEntry;
   idx: number;
-  onLaunchDebate: (cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string; queryOverride?: string }) => void;
+  onLaunchDebate: (cfg: LaunchCfg & { queryOverride?: string }) => void;
   onCustomSetup: (query: string) => void;
   isLast: boolean;
   debateLocked: boolean;
@@ -783,7 +808,7 @@ function FollowUpEntryCard({ entry, idx, onLaunchDebate, onCustomSetup, isLast, 
       </div>
       {/* Question */}
       <div className="bg-muted/40 border border-border rounded-lg px-4 py-3">
-        <p className="text-xs font-medium text-muted-foreground mb-1">You asked</p>
+        <p className="text-xs font-medium text-muted-foreground mb-1">{t("you_asked")}</p>
         <p className="text-sm text-foreground">{entry.query}</p>
       </div>
       {/* Answer */}
@@ -910,7 +935,7 @@ export default function SessionPage() {
 
   // Launch a child debate session — parent never mutated, new block appends below
   const debateMutation = useMutation({
-    mutationFn: async (cfg: { selectedModels: string[]; iterations: number; temperature: number; consensusThreshold: number; workflowId?: string; queryOverride?: string }) => {
+    mutationFn: async (cfg: LaunchCfg & { queryOverride?: string }) => {
       const { queryOverride, ...rest } = cfg;
       const res = await apiRequest("POST", `/api/sessions/${id}/debate`, {
         ...rest,
@@ -938,7 +963,7 @@ export default function SessionPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
       setRenaming(false);
-      toast({ title: "Inquiry renamed." });
+      toast({ title: t("toast_renamed") });
     },
   });
 
@@ -1185,7 +1210,7 @@ export default function SessionPage() {
             <div className="border border-border rounded-xl p-4 space-y-4 bg-card">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Round {session.currentIteration} of {session.totalIterations}</p>
+                  <p className="text-sm font-semibold text-foreground">{t("round_of_tmpl").replace("{n}", String(session.currentIteration)).replace("{total}", String(session.totalIterations))}</p>
                   <p className="text-xs text-muted-foreground capitalize">{currentPhase} phase</p>
                 </div>
                 <span className="text-2xl font-bold text-foreground tabular-nums">{progress}%</span>
@@ -1207,7 +1232,7 @@ export default function SessionPage() {
               <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                 <span className="text-xs font-semibold text-foreground">{t("live_badge")}</span>
-                {liveIters.length > 0 && <Badge variant="outline" className="text-xs py-0 ml-auto">{liveIters.length} round{liveIters.length !== 1 ? "s" : ""} complete</Badge>}
+                {liveIters.length > 0 && <Badge variant="outline" className="text-xs py-0 ml-auto">{t("rounds_done_tmpl").replace("{n}", String(liveIters.length))}</Badge>}
               </div>
               {liveIters.length === 0 ? (
                 <div className="px-4 py-6 space-y-4">
@@ -1329,7 +1354,7 @@ export default function SessionPage() {
                 <span className="text-xs text-muted-foreground">Follow-up {followUps.length + 1}</span>
               </div>
               <div className="bg-muted/40 border border-border rounded-lg px-4 py-3">
-                <p className="text-xs font-medium text-muted-foreground mb-1">You asked</p>
+                <p className="text-xs font-medium text-muted-foreground mb-1">{t("you_asked")}</p>
                 <p className="text-sm text-foreground">{pendingFollowUp}</p>
               </div>
               <div className="border border-border rounded-xl p-4 flex items-center gap-3">
@@ -1359,11 +1384,11 @@ export default function SessionPage() {
               <div className="flex items-center gap-3">
                 <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Inquiry failed</p>
+                  <p className="text-sm font-semibold text-foreground">{t("inquiry_failed")}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">Check your API key in Settings and try again.</p>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate("/chat")}>New inquiry</Button>
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate("/chat")}>{t("sidebar_new_inquiry")}</Button>
             </div>
           )}
 

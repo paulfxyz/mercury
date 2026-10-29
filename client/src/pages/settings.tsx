@@ -14,6 +14,7 @@ import {
   Star, StarOff, Clock, Server, Check,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { useAppConfig } from "@/lib/config";
 
 interface SavedKey { id: string; label: string; masked: string; isPrimary: number; createdAt: number; }
 
@@ -92,6 +93,7 @@ export default function SettingsPage() {
   const [showSessionInput, setShowSessionInput] = useState(false);
   const [showSessionVal, setShowSessionVal] = useState(false);
 
+  const config = useAppConfig();
   const { data: keysData, isLoading: keysLoading } = useQuery<{ keys: SavedKey[]; hasLegacyKey: boolean }>({
     queryKey: ["/api/keys"],
     staleTime: 0,
@@ -148,6 +150,9 @@ export default function SettingsPage() {
           </div>
 
           {/* ── API Keys ─────────────────────────────────────── */}
+          {config?.demo ? (
+            <div className="border border-border rounded-xl bg-card p-4 text-sm text-muted-foreground leading-relaxed">{t("demo_notice")}</div>
+          ) : (
           <div className="border border-border rounded-xl overflow-hidden bg-card">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div className="flex items-center gap-2">
@@ -240,6 +245,7 @@ export default function SettingsPage() {
 
             </div>
           </div>
+          )}
 
           {/* ── Session Key ──────────────────────────────────── */}
           <div className="border border-border rounded-xl overflow-hidden bg-card">
@@ -269,7 +275,7 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => { setSessionKey(null); toast({ title: "Session key cleared." }); }}
+                    onClick={() => { setSessionKey(null); toast({ title: t("toast_session_key_cleared") }); }}
                     className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <Unlink className="w-3.5 h-3.5" /> {t("btn_clear")}
@@ -299,7 +305,7 @@ export default function SettingsPage() {
                               setSessionKey(sessionInput.trim());
                               setSessionInput("");
                               setShowSessionInput(false);
-                              toast({ title: t("toast_session_key_title"), description: "Cleared when you close this tab." });
+                              toast({ title: t("toast_session_key_title"), description: t("toast_session_key_desc") });
                             }
                           }}
                         />
@@ -318,7 +324,7 @@ export default function SettingsPage() {
                             setSessionKey(sessionInput.trim());
                             setSessionInput("");
                             setShowSessionInput(false);
-                            toast({ title: t("toast_session_key_title"), description: "Cleared when you close this tab." });
+                            toast({ title: t("toast_session_key_title"), description: t("toast_session_key_desc") });
                           }}
                           disabled={sessionInput.trim().length < 10}
                           className="flex-1"

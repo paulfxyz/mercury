@@ -5,6 +5,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.8.0] — 2026-10-29
+
+An audit release. Every claim in the README and on the landing page was checked against the code; the ones that did not hold were fixed or removed. Details in [docs/AUDIT.md](docs/AUDIT.md), measurements in [docs/BENCHMARK.md](docs/BENCHMARK.md).
+
+### Fixed
+- **Consensus was not consensus.** It was the fraction of models that returned a response, so it was almost always 100 percent. Debate and vote rounds now end with `VOTE: … | SCORE: 1-10`, which is parsed; consensus is the mean score of the models that voted.
+- **Early exit skipped the ending.** Reaching the threshold used to stop the run before the synthesis and the final answer. It now drops only the remaining debate and vote rounds.
+- **Short debates had no debate.** The one-click debate (3 rounds) ran research, synthesis and final only. Phase planning is now explicit: 3 rounds include a debate round, and the one-click debate is 4 rounds.
+- **The final answer** was whichever model replied first in the last round. One model now writes it from the whole record, with fallback to the next model.
+- **Custom roles never reached the server.** The wizard and workflows collected role text that was dropped. Roles are now sent and applied.
+- **Follow-ups had no context.** They are now answered with the original question, its answer and recent follow-ups.
+- **Public demo leaked data.** `GET /api/sessions` returned every visitor's inquiries to anyone. See demo mode below.
+- **Dead and risky code removed:** an unauthenticated, unused file-upload endpoint (`multer`), the legacy `/api/research` route and a no-op key update route.
+- **Sessions left "running"** by a crash or restart are marked as errors on boot. Deleting an inquiry now deletes its child debates.
+- **Model list** no longer includes routers with placeholder negative prices or asynchronous `:batch` variants.
+- **Interface text:** about 45 strings that were still hard-coded in English (workflow editor, model search, round and consensus labels, toasts, menu labels) are now translated in all 15 languages. Several strings claimed "100+ models" or "Top 3 models" and were reworded.
+- **Dead code:** about 450 lines of an unused duplicate wizard in `chat.tsx` and an unused `ModelSelector` component were removed.
+
+### Added
+- **Demo mode** (`MERCURY_DEMO=1`): keys are never stored on the server, each visitor only sees their own inquiries, workflows and theme, and limits apply (5 models, 10 rounds, 20 inquiries per hour).
+- **`MERCURY_PASSWORD`**: optional HTTP Basic password for the whole app and its WebSocket.
+- **Resilient OpenRouter client:** 120-second timeout, three attempts with backoff on rate limits, server errors, network errors and empty responses, 8,000 output tokens, and exact per-call cost from OpenRouter.
+- **Suggested panels** in the wizard (Quick and affordable, Balanced, Frontier, Global mix), one click each.
+- **Server-side validation** of model IDs, round counts, temperature and threshold; `/api/config`, `/healthz`.
+- **`npm test`**: unit tests for phase planning and vote parsing.
+- **`benchmark/`** and **`docs/BENCHMARK.md`**: 30 questions with computed answers, 7 arms, raw results and a report script. **`benchmark/verify_models.py`** checks every hard-coded model ID against OpenRouter.
+- **`docs/AUDIT.md`**: claims against evidence, with open limitations.
+- **`script/i18n/`**: the translation sources now live in the repository (`python3 script/i18n/combine.py`).
+
+### Changed
+- **Models refreshed** to the current OpenRouter catalogue: quick model Claude Haiku 5.5; one-click panel Claude Haiku 5.5, GPT-6 Luna and DeepSeek V4.1 Flash; suggested panels built from Claude Opus 5.5, Sonnet 5.5, GPT-6.1 Sol and Terra, Gemini 4 Argon and 3.8 Flash, Grok 4.7, Kimi K3.1 Pro, GLM 5.3 Prime, Qwen 3.8 Max Prime and Mistral Large 4. Model IDs now live in `shared/defaults.ts` and `client/src/lib/models.ts` only.
+- **README rewritten** and shortened. It no longer claims that mixed-vendor panels or custom roles improve results (untested), that the client "never polls" or has an SSE fallback (it polls every 2 seconds as a fallback; there is no SSE), or that keys "never leave your server" (session keys are sent per request; saved keys are stored unencrypted). The long engineering write-up moved to `docs/ENGINEERING_NOTES.md`.
+- **Dependencies:** `npm audit` for production dependencies went from 14 findings (1 critical) to 2 (zod, which is only used for types here, and a low-severity development-server issue in esbuild). `drizzle-orm` updated to 0.45.4; `zod-validation-error` and `multer` removed.
+
+### Notes
+- Saved API keys remain stored as plain text in SQLite. This is documented, not changed.
+- Existing sessions from before this release have no owner and are not shown on a `MERCURY_DEMO=1` instance. They are not deleted.
+
+---
+
 ## [3.7.9] — 2026-04-10
 
 ### Added
