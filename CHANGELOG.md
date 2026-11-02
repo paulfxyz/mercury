@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.9.1] — 2026-11-02
+
+Documentation and website only. No change to the API or the app's behaviour.
+
+### Added
+- README: screenshots of a real debate, the workflow picker, the workflows page and the API and MCP page, plus an architecture diagram for agent use (`docs/assets/`).
+- mercury.sh: a short block in the API and MCP section explaining that Mercury is a platform for agentic workflows, translated into all 15 languages.
+
+---
+
 ## [3.9.0] — 2026-11-02
 
 Mercury becomes a debate organiser that other agents can call, and the demo gets ready-made workflows.

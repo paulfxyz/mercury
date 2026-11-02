@@ -5,13 +5,17 @@
 **Ask once. Get an instant answer. Then, if it matters, let a panel of AI models research, debate and vote.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-3.9.0-brightgreen?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-3.9.1-brightgreen?style=for-the-badge)](CHANGELOG.md)
 [![Built with TypeScript](https://img.shields.io/badge/Built%20with-TypeScript-3178c6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Powered by OpenRouter](https://img.shields.io/badge/Powered%20by-OpenRouter-6c47ff?style=for-the-badge)](https://openrouter.ai)
 
 [Live demo](https://demo.mercury.sh) · [Website](https://mercury.sh) · [Install](INSTALL.md) · [Changelog](CHANGELOG.md) · [API](docs/API.md) · [MCP](docs/MCP.md) · [Audit](docs/AUDIT.md) · [Benchmark](docs/BENCHMARK.md)
 
 </div>
+
+<p align="center">
+  <img src="docs/assets/screenshot-result.png" alt="A finished Mercury debate: four rounds, 83% consensus and the final answer" width="900">
+</p>
 
 ---
 
@@ -26,9 +30,23 @@ Mercury is a self-hosted web app for asking one question to many language models
 
 You can watch the rounds arrive live, reopen old debates, run several debates under one inquiry, and save panel setups as workflows (including a custom role per model). The interface is available in 15 languages.
 
+### Screenshots
+
+| Ask, then pick a workflow | Read the debate round by round |
+|---|---|
+| ![Home screen with the workflow picker](docs/assets/screenshot-home.png) | ![Round 2 of a debate with each model's critique](docs/assets/screenshot-rounds.png) |
+| **Save panel setups as workflows** | **API and MCP page** |
+| ![Workflows page with the two ready-made workflows](docs/assets/screenshot-workflows.png) | ![API and MCP page with curl and MCP configuration](docs/assets/screenshot-integrations.png) |
+
+The screenshots show a real four-round debate on the budget workflow (Haiku 5.5, GPT-6 Luna and DeepSeek V4.1 Flash) about password hashing.
+
 ## Use it from your agents (API and MCP)
 
-Mercury is also a debate organiser for other programs. Send a question, get back one answer with a consensus score and the cost, all on your own OpenRouter key:
+<p align="center">
+  <img src="docs/assets/agents-flow.svg" alt="Your agent calls Mercury over REST or MCP. Mercury runs a panel of models through OpenRouter and returns one answer with a consensus score and the cost." width="900">
+</p>
+
+Mercury is also a debate organiser for other programs, so it can be one step in an agentic workflow. Send a question, get back one answer with a consensus score and the cost, all on your own OpenRouter key:
 
 ```bash
 curl -X POST https://demo.mercury.sh/api/v1/debates \
@@ -181,7 +199,7 @@ See [docs/AUDIT.md](docs/AUDIT.md) for the full list of what was checked and cha
 
 ## Changelog
 
-The latest release is **v3.9.0**: a REST API and an MCP server so other agents can use Mercury as a debate organiser, two ready-made workflows per demo visitor, a workflow picker on the home screen, a short workflow tutorial, and a proofreading pass over the new translations. v3.8.0 was the audit release. See [CHANGELOG.md](CHANGELOG.md).
+The latest release is **v3.9.1**, which adds screenshots and an architecture diagram to this README. v3.9.0 added a REST API and an MCP server so other agents can use Mercury as a debate organiser, two ready-made workflows per demo visitor, a workflow picker on the home screen, a short workflow tutorial, and a proofreading pass over the new translations. v3.8.0 was the audit release. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Author
 

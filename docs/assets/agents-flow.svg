@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 270" role="img" aria-labelledby="t d" font-family="Inter, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <title id="t">How agents use Mercury</title>
+  <desc id="d">Your agent, script or automation calls Mercury over REST or MCP. Mercury runs a panel of models through OpenRouter and returns one answer with a consensus score and the cost.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#6b7280"/></marker>
+  </defs>
+  <rect width="900" height="270" rx="18" fill="#f8f8f7"/>
+  <!-- agent -->
+  <g transform="translate(40 70)">
+    <rect width="190" height="120" rx="14" fill="#fff" stroke="#d4d4d0"/>
+    <g transform="translate(77 14)" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="0" y="10" width="36" height="26" rx="7"/><path d="M18 10V3"/><circle cx="18" cy="2" r="2"/>
+      <circle cx="11" cy="23" r="2" fill="#111"/><circle cx="25" cy="23" r="2" fill="#111"/>
+    </g>
+    <text x="95" y="76" text-anchor="middle" font-size="16" font-weight="600" fill="#111">Your agent</text>
+    <text x="95" y="98" text-anchor="middle" font-size="12" fill="#6b7280">assistant, script, automation</text>
+  </g>
+  <!-- mercury -->
+  <g transform="translate(355 55)">
+    <rect width="190" height="150" rx="14" fill="#111"/>
+    <text x="95" y="62" text-anchor="middle" font-size="40" fill="#fff">&#9791;</text>
+    <text x="95" y="92" text-anchor="middle" font-size="18" font-weight="600" fill="#fff">Mercury</text>
+    <text x="95" y="116" text-anchor="middle" font-size="12" fill="#d4d4d0">REST API  /  MCP server</text>
+  </g>
+  <!-- models -->
+  <g transform="translate(670 40)">
+    <rect width="190" height="42" rx="21" fill="#fff" stroke="#d4d4d0"/><text x="95" y="26" text-anchor="middle" font-size="13" fill="#111">Model A</text>
+    <rect y="62" width="190" height="42" rx="21" fill="#fff" stroke="#d4d4d0"/><text x="95" y="88" text-anchor="middle" font-size="13" fill="#111">Model B</text>
+    <rect y="124" width="190" height="42" rx="21" fill="#fff" stroke="#d4d4d0"/><text x="95" y="150" text-anchor="middle" font-size="13" fill="#111">Model C</text>
+    <text x="95" y="196" text-anchor="middle" font-size="12" fill="#6b7280">debate through OpenRouter</text>
+  </g>
+  <path d="M232 130H352" stroke="#6b7280" stroke-width="2" marker-end="url(#a)" fill="none"/>
+  <path d="M547 105L664 63" stroke="#6b7280" stroke-width="2" marker-end="url(#a)" fill="none"/>
+  <path d="M547 130L664 123" stroke="#6b7280" stroke-width="2" marker-end="url(#a)" fill="none"/>
+  <path d="M547 155L664 183" stroke="#6b7280" stroke-width="2" marker-end="url(#a)" fill="none"/>
+  <text x="292" y="118" text-anchor="middle" font-size="12" fill="#6b7280">question</text>
+  <path d="M420 207V234H135V192" stroke="#16a34a" stroke-width="2" marker-end="url(#a)" fill="none" stroke-linejoin="round"/>
+  <text x="277" y="252" text-anchor="middle" font-size="12" fill="#15803d">one answer, consensus, cost</text>
+</svg>
