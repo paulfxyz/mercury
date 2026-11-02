@@ -17,7 +17,7 @@ import { useAppConfig } from "@/lib/config";
 type SaveMode = "server" | "session";
 
 export default function OnboardingPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [key, setKey] = useState("");
   const [label, setLabel] = useState("");
   const [show, setShow] = useState(false);
@@ -48,6 +48,8 @@ export default function OnboardingPage() {
   function handleSessionOnly() {
     if (!key.trim()) return;
     setSessionKey(key.trim());
+    // Give this visitor the two ready-made workflows (once per visitor; the server ignores repeats).
+    apiRequest("POST", "/api/workflows/seed", { lang }).then(() => queryClient.invalidateQueries({ queryKey: ["/api/workflows"] })).catch(() => {});
     toast({ title: t("toast_session_key_title"), description: t("toast_session_key_desc") });
     navigate("/chat");
   }

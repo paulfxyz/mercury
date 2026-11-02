@@ -10,6 +10,7 @@ import OnboardingPage from "@/pages/onboarding";
 import SessionPage from "@/pages/session";
 import SettingsPage from "@/pages/settings";
 import WorkflowsPage from "@/pages/workflows";
+import IntegrationsPage from "@/pages/integrations";
 import NotFound from "@/pages/not-found";
 
 // ─── Theme ────────────────────────────────────────────────────
@@ -113,6 +114,7 @@ function AppRouter() {
       <Route path="/chat" component={ChatPage} />
       <Route path="/session/:id" component={SessionPage} />
       <Route path="/workflows" component={WorkflowsPage} />
+      <Route path="/integrations" component={IntegrationsPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route path="/" component={() => null} />
       <Route component={NotFound} />

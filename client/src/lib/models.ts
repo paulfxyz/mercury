@@ -1,4 +1,4 @@
-import { QUICK_PANEL } from "@shared/defaults";
+import { PANELS } from "@shared/defaults";
 import type { TranslationKey } from "@/lib/i18n";
 
 /**
@@ -12,31 +12,8 @@ export interface SuggestedPanel {
   models: string[];
 }
 
-export const SUGGESTED_PANELS: SuggestedPanel[] = [
-  {
-    id: "quick",
-    nameKey: "pack_quick",
-    models: QUICK_PANEL.map(p => p.id),
-  },
-  {
-    id: "balanced",
-    nameKey: "pack_balanced",
-    models: ["openai/gpt-6.1-terra", "anthropic/claude-sonnet-5.5", "google/gemini-3.8-flash", "x-ai/grok-4.7"],
-  },
-  {
-    id: "frontier",
-    nameKey: "pack_frontier",
-    models: ["anthropic/claude-opus-5.5", "openai/gpt-6.1-sol", "google/gemini-4-argon", "x-ai/grok-4.7"],
-  },
-  {
-    id: "global",
-    nameKey: "pack_global",
-    models: [
-      "moonshotai/kimi-k3.1-pro",
-      "deepseek/deepseek-v4.1-flash-1017",
-      "z-ai/glm-5.3-prime",
-      "qwen/qwen3.8-max-prime",
-      "mistralai/mistral-large-4-0",
-    ],
-  },
-];
+export const SUGGESTED_PANELS: SuggestedPanel[] = PANELS.map(p => ({
+  id: p.id,
+  nameKey: ({ quick: "pack_quick", balanced: "pack_balanced", frontier: "pack_frontier", global: "pack_global" } as const)[p.id as "quick"],
+  models: p.models,
+}));

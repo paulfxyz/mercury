@@ -97,6 +97,7 @@ That's it. Your app is at `https://your-app-name.fly.dev`.
 | `NODE_ENV` | — | Set to `production` for production mode |
 | `DB_PATH` | `mercury.db` | Path to SQLite database file |
 | `MERCURY_PASSWORD` | unset | If set, the app and its WebSocket require this password (HTTP Basic, any username) |
+| `MERCURY_API_TOKEN` | unset | Enables the REST API (`/api/v1`) and MCP server (`/mcp`). Send it as `Authorization: Bearer ...`. See docs/API.md |
 | `MERCURY_DEMO` | unset | `1` for a public demo: no server-side keys, per-visitor data, request limits |
 
 ---

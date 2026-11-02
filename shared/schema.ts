@@ -20,6 +20,7 @@ export const sessions = sqliteTable("sessions", {
   debates: text("debates").notNull().default("[]"),     // JSON: [{sessionId, query, createdAt}]
   parentId: text("parent_id"),                           // set on child debate sessions, null on root sessions
   owner: text("owner"),                                  // anonymous visitor id (used to scope data in demo mode)
+  costUsd: real("cost_usd"),                             // total OpenRouter cost of a debate, as reported by OpenRouter
   createdAt: integer("created_at").notNull(),
 });
 export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true, createdAt: true });

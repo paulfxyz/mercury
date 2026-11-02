@@ -370,7 +370,7 @@ export async function runOrchestration(
 
   const finalRound = history[history.length - 1];
   const finalAnswer = finalRound?.entries[0]?.text ?? "";
-  storage.updateSession(sessionId, { status: "completed", finalAnswer });
+  storage.updateSession(sessionId, { status: "completed", finalAnswer, costUsd });
   onProgress({ type: "completed", finalAnswer, consensus: lastConsensus, costUsd });
   return { finalAnswer, consensus: lastConsensus, costUsd, rounds: plan.length };
 }

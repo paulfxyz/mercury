@@ -1,30 +1,17 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import type { Server } from "http";
 import { randomUUID, timingSafeEqual } from "crypto";
-import { WebSocketServer, WebSocket } from "ws";
+import { WebSocketServer } from "ws";
 import { storage } from "./storage";
 import {
   runOrchestration, runQuickAnswer, answerQuick, detectQueryComplexity, fetchOpenRouterModels,
 } from "./orchestrator";
 import { QUICK_MODEL, LIMITS } from "@shared/defaults";
-
-// ─── Deployment mode ─────────────────────────────────────────
-// MERCURY_DEMO=1      public demo: every visitor only sees their own data, nothing is saved server-side
-//                     except that visitor's sessions, and API keys are never stored.
-// MERCURY_PASSWORD=…  optional HTTP Basic password for the whole app (self-hosted, single user).
-const DEMO = process.env.MERCURY_DEMO === "1";
-const PASSWORD = process.env.MERCURY_PASSWORD ?? "";
-
-const DEMO_LIMITS = { maxModels: 5, maxRounds: 10, inquiriesPerHour: 20 };
-
-// ─── WebSocket fan-out ───────────────────────────────────────
-const sessionClients = new Map<string, Set<WebSocket>>();
-function broadcast(sessionId: string, data: Record<string, unknown>) {
-  const clients = sessionClients.get(sessionId);
-  if (!clients) return;
-  const msg = JSON.stringify(data);
-  clients.forEach(ws => { if (ws.readyState === WebSocket.OPEN) ws.send(msg); });
-}
+import { DEMO, PASSWORD, DEMO_LIMITS, limits, rateLimited, num, parseDebateConfig } from "./config";
+import { sessionClients, broadcast, runInBackground } from "./debates";
+import { registerApiRoutes } from "./api";
+import { registerMcp } from "./mcp";
+import { seedWorkflows } from "./seed";
 
 // ─── Small helpers ───────────────────────────────────────────
 const COOKIE = "mercury_owner";
@@ -68,43 +55,6 @@ function resolveApiKey(req: Request): string | undefined {
   return storage.getSetting("openrouter_api_key")?.value || undefined;
 }
 
-const num = (v: unknown, d: number, lo: number, hi: number) => {
-  const n = typeof v === "number" ? v : parseFloat(String(v));
-  return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d;
-};
-
-interface DebateConfig { models: string[]; roles: string[]; rounds: number; temperature: number; threshold: number }
-
-/** Validates and clamps debate settings coming from the client. Returns an error message on failure. */
-function parseDebateConfig(body: any): DebateConfig | string {
-  const rawModels: unknown = body.selectedModels;
-  if (!Array.isArray(rawModels) || rawModels.length === 0) return "At least one model must be selected.";
-  const models = rawModels.filter((m): m is string => typeof m === "string" && /^[\w.\-]+\/[\w.:\-]+$/.test(m));
-  if (models.length === 0) return "The selected models are not valid OpenRouter model IDs.";
-  const maxModels = DEMO ? DEMO_LIMITS.maxModels : LIMITS.maxModels;
-  if (models.length > maxModels) return `At most ${maxModels} models can be used in one debate.`;
-  const roles = Array.isArray(body.roles) ? body.roles.map((r: unknown) => String(r ?? "").slice(0, 500)) : [];
-  const maxRounds = DEMO ? DEMO_LIMITS.maxRounds : LIMITS.maxRounds;
-  return {
-    models, roles,
-    rounds: Math.round(num(body.iterations, 8, 1, maxRounds)),
-    temperature: num(body.temperature, 0.7, 0, 1.5),
-    threshold: num(body.consensusThreshold, 0.7, 0.3, 1),
-  };
-}
-
-const hits = new Map<string, number[]>();
-/** Tiny in-memory rate limiter, used for debate/quick-answer creation in demo mode. */
-function rateLimited(key: string): boolean {
-  if (!DEMO) return false;
-  const now = Date.now();
-  const recent = (hits.get(key) ?? []).filter(t => now - t < 3600_000);
-  if (recent.length >= DEMO_LIMITS.inquiriesPerHour) { hits.set(key, recent); return true; }
-  recent.push(now);
-  hits.set(key, recent);
-  return false;
-}
-
 const pid = (req: Request) => String(req.params.id);
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -119,7 +69,7 @@ export function registerRoutes(httpServer: Server, app: Express) {
       return given.length === expected.length && timingSafeEqual(given, expected);
     };
     app.use((req: Request, res: Response, next: NextFunction) => {
-      if (req.path === "/healthz" || check(req.headers.authorization)) return next();
+      if (req.path === "/healthz" || req.path.startsWith("/api/v1") || req.path === "/mcp" || check(req.headers.authorization)) return next();
       res.set("WWW-Authenticate", 'Basic realm="Mercury"').status(401).send("Authentication required.");
     });
     httpServer.on("upgrade", (req, socket) => {
@@ -128,6 +78,8 @@ export function registerRoutes(httpServer: Server, app: Express) {
   }
 
   app.get("/healthz", (_req, res) => res.json({ ok: true }));
+  registerApiRoutes(app);
+  registerMcp(app);
 
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
   wss.on("connection", (ws, req) => {
@@ -146,7 +98,7 @@ export function registerRoutes(httpServer: Server, app: Express) {
   app.get("/api/config", (_req, res) => {
     res.json({
       demo: DEMO,
-      limits: DEMO ? DEMO_LIMITS : { maxModels: LIMITS.maxModels, maxRounds: LIMITS.maxRounds },
+      limits: DEMO ? DEMO_LIMITS : limits(),
       quickModel: QUICK_MODEL,
     });
   });
@@ -243,6 +195,13 @@ export function registerRoutes(httpServer: Server, app: Express) {
   });
 
   // ─── Workflows ─────────────────────────────────────────────
+  // Gives the caller the two ready-made workflows, once (called by the client after a key is entered).
+  app.post("/api/workflows/seed", (req, res) => {
+    const lang = typeof req.body?.lang === "string" ? req.body.lang.slice(0, 8) : "en";
+    const created = seedWorkflows(DEMO ? ownerOf(req, res) : null, lang);
+    res.json({ created });
+  });
+
   app.get("/api/workflows", (req, res) => res.json(storage.listWorkflows(scope(req, res))));
 
   app.get("/api/workflows/:id", (req, res) => {
@@ -436,6 +395,9 @@ export function registerRoutes(httpServer: Server, app: Express) {
     ));
   });
 
+  // A fresh self-hosted instance starts with the two ready-made workflows (demo visitors get them when they enter a key).
+  if (!DEMO) seedWorkflows(null, "en");
+
   // Sessions left "running" by a crash or restart can never finish; mark them as errored on boot.
   for (const s of storage.listSessions()) {
     for (const id of [s.id, ...safeDebateIds(s.debates)]) {
@@ -446,15 +408,6 @@ export function registerRoutes(httpServer: Server, app: Express) {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
-async function runInBackground(sessionId: string, job: () => Promise<unknown>) {
-  try {
-    await job();
-  } catch (e) {
-    storage.updateSession(sessionId, { status: "error" });
-    broadcast(sessionId, { type: "error", message: errMsg(e) });
-  }
-}
-
 function safeDebateIds(raw: string | null | undefined): string[] {
   try { return (JSON.parse(raw ?? "[]") as Array<{ sessionId: string }>).map(d => d.sessionId); } catch { return []; }
 }

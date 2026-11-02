@@ -5,6 +5,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 exec(open(os.path.join(HERE, 'part1.py')).read())
 exec(open(os.path.join(HERE, 'part2.py')).read())
 exec(open(os.path.join(HERE, 'part3.py')).read())
+T3 = T
+exec(open(os.path.join(HERE, 'part4.py')).read())
+T = {**T3, **T}
 
 LANGS = {
     'en': EN, 'fr': FR, 'es': ES, 'de': DE, 'it': IT,

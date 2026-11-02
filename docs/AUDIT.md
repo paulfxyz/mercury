@@ -53,4 +53,4 @@ Status key: Fixed means the code or text was changed in v3.8.0. Corrected means 
 - Open-ended questions: no evidence either way on whether a panel helps.
 - Browser automation did not exercise a real debate end to end through the UI (it needs a paid API key); the orchestrator was exercised through the benchmark harness instead.
 - Saved keys are unencrypted; there are no user accounts; the demo rate limit is per process.
-- Only 15 languages are covered by a manual read of the new strings. They were written for this release and have not been reviewed by native speakers.
+- Translations: the strings added in 3.8.0 and 3.9.0 were machine-written (Claude Sonnet 5.5) and then proofread by a second, independent model (GPT-6.1 Terra) in 3.9.0; about 250 corrections were applied. They have not been reviewed by native speakers.

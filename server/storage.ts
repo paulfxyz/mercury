@@ -77,6 +77,7 @@ for (const col of [
   "ALTER TABLE workflows ADD COLUMN temperature REAL NOT NULL DEFAULT 0.7;",
   "ALTER TABLE workflows ADD COLUMN consensus_threshold REAL NOT NULL DEFAULT 0.7;",
   "ALTER TABLE sessions ADD COLUMN owner TEXT;",
+  "ALTER TABLE sessions ADD COLUMN cost_usd REAL;",
   "ALTER TABLE workflows ADD COLUMN owner TEXT;",
 ]) {
   try { sqlite.exec(col); } catch { /* already exists */ }

@@ -5,6 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.9.0] — 2026-11-02
+
+Mercury becomes a debate organiser that other agents can call, and the demo gets ready-made workflows.
+
+### Added
+- **REST API** under `/api/v1`: start a debate (optionally waiting for the result), get or list debates, quick answer, workflows, panels, models. Described by OpenAPI at `/api/v1/openapi.json`. See [docs/API.md](docs/API.md).
+- **MCP server** at `/mcp` (Streamable HTTP, stateless) with five tools: `mercury_debate`, `mercury_get_debate`, `mercury_list_debates`, `mercury_quick_answer`, `mercury_list_workflows`. See [docs/MCP.md](docs/MCP.md).
+- **Credentials for programs:** on the public demo the caller sends only their OpenRouter key (`X-OpenRouter-Key`), which is never stored and scopes the caller's debates to a hash of the key. On a self-hosted instance, `MERCURY_API_TOKEN` enables the API as a bearer token.
+- **API and MCP page** in the app with copy-ready snippets for the current host.
+- **Two ready-made workflows** for every demo visitor (and every fresh self-hosted instance): a Precision panel (Claude Opus 5.5, GPT-6.1 Sol, Gemini 4 Argon; ten rounds; threshold 0.9; analyst, sceptic and fact-checker roles) and a Budget quick check (three low-cost models, four rounds). Names and descriptions are localised in 15 languages.
+- **Workflow picker on the home screen:** choose a workflow to run right after the quick answer, or decide afterwards.
+- **Workflow tutorial** shown in the editor when creating a workflow, until dismissed.
+- **Landing page:** a live-demo section (how the key tryout works and how to self-host instead) and an API and MCP section, in 15 languages.
+- Total debate cost (`cost_usd`) is now stored with each debate.
+- Unit tests for the API layer (15 tests in total).
+
+### Changed
+- **Translations proofread** by an independent model (GPT-6.1 Terra, via OpenRouter) for the strings added in 3.8.0 and 3.9.0 and the changed landing copy: about 250 corrections accepted across 14 languages (untranslated phase names, register, grammar, terminology). Terminology changes that would have broken the existing glossary were rejected. The review has not been done by native speakers.
+- Server code split into `config.ts`, `debates.ts`, `api.ts`, `mcp.ts`, `seed.ts`; suggested panels and seed workflows live in `shared/defaults.ts`.
+- The landing page navigation fits narrow phones.
+
+### Operations
+- Debate data created before 3.8.0 on the public demo (sessions without an owner) was deleted from the demo database.
+
+---
+
 ## [3.8.0] — 2026-10-29
 
 An audit release. Every claim in the README and on the landing page was checked against the code; the ones that did not hold were fixed or removed. Details in [docs/AUDIT.md](docs/AUDIT.md), measurements in [docs/BENCHMARK.md](docs/BENCHMARK.md).

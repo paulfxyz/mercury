@@ -5,11 +5,11 @@
 **Ask once. Get an instant answer. Then, if it matters, let a panel of AI models research, debate and vote.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-3.8.0-brightgreen?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-3.9.0-brightgreen?style=for-the-badge)](CHANGELOG.md)
 [![Built with TypeScript](https://img.shields.io/badge/Built%20with-TypeScript-3178c6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Powered by OpenRouter](https://img.shields.io/badge/Powered%20by-OpenRouter-6c47ff?style=for-the-badge)](https://openrouter.ai)
 
-[Live demo](https://demo.mercury.sh) · [Website](https://mercury.sh) · [Install](INSTALL.md) · [Changelog](CHANGELOG.md) · [Audit](docs/AUDIT.md) · [Benchmark](docs/BENCHMARK.md)
+[Live demo](https://demo.mercury.sh) · [Website](https://mercury.sh) · [Install](INSTALL.md) · [Changelog](CHANGELOG.md) · [API](docs/API.md) · [MCP](docs/MCP.md) · [Audit](docs/AUDIT.md) · [Benchmark](docs/BENCHMARK.md)
 
 </div>
 
@@ -25,6 +25,20 @@ Mercury is a self-hosted web app for asking one question to many language models
 4. **Final answer.** One model writes the answer to your original question.
 
 You can watch the rounds arrive live, reopen old debates, run several debates under one inquiry, and save panel setups as workflows (including a custom role per model). The interface is available in 15 languages.
+
+## Use it from your agents (API and MCP)
+
+Mercury is also a debate organiser for other programs. Send a question, get back one answer with a consensus score and the cost, all on your own OpenRouter key:
+
+```bash
+curl -X POST https://demo.mercury.sh/api/v1/debates \
+  -H "X-OpenRouter-Key: sk-or-v1-..." -H "Content-Type: application/json" \
+  -d '{"query": "Should we ship on Friday?", "workflow": "budget", "wait": 60}'
+```
+
+- **REST API** under `/api/v1`, described by OpenAPI at `/api/v1/openapi.json`. See [docs/API.md](docs/API.md).
+- **MCP server** at `/mcp` with the tools `mercury_debate`, `mercury_get_debate`, `mercury_list_debates`, `mercury_quick_answer` and `mercury_list_workflows`. See [docs/MCP.md](docs/MCP.md).
+- On the public demo you only send your OpenRouter key. On a self-hosted instance set `MERCURY_API_TOKEN` and send it as a bearer token.
 
 ## What it does and does not do
 
@@ -52,6 +66,7 @@ Production build: `npm run build && npm start`. Docker and Fly.io instructions a
 | `PORT` | `5000` | HTTP port. |
 | `DB_PATH` | `mercury.db` | Location of the SQLite file. |
 | `MERCURY_PASSWORD` | unset | If set, the whole app (including the WebSocket) asks for this password using HTTP Basic authentication. Use it for any instance reachable from the internet. |
+| `MERCURY_API_TOKEN` | unset | Enables the REST API and MCP server on a self-hosted instance (bearer token). |
 | `MERCURY_DEMO` | unset | Set to `1` for a public demo. See below. |
 
 ### Your API key
@@ -68,6 +83,8 @@ Mercury has two ways to hold your OpenRouter key:
 - Keys are never stored on the server; visitors paste their own, kept in their tab.
 - Each visitor only sees their own inquiries, workflows and theme (identified by an anonymous cookie). Nothing is shared between visitors.
 - Limits apply: at most 5 models and 10 rounds per debate, and 20 new inquiries per hour per visitor.
+- Every visitor gets two ready-made workflows when they enter a key: a Precision panel (Claude Opus 5.5, GPT-6.1 Sol and Gemini 4 Argon, ten rounds, strict threshold, most expensive) and a Budget quick check (three cheap models, four rounds). On the home screen you can pick a workflow to run right after the quick answer, or choose one afterwards on the inquiry page.
+- The API and MCP server work on the demo with just an OpenRouter key; those debates are private to the key.
 
 The cookie identifies a browser, not a person. Clearing cookies orphans that visitor's data.
 
@@ -78,6 +95,8 @@ client (React, Vite, Tailwind, TanStack Query, 15 languages)
    │  REST + WebSocket (/ws?sessionId=…)
 server (Express, ws)
    ├─ routes.ts        validation, key resolution, demo scoping, optional password
+   ├─ api.ts, mcp.ts   REST API (/api/v1) and MCP server (/mcp) for other programs
+   ├─ debates.ts       starting debates, result views, live fan-out
    ├─ orchestrator.ts  OpenRouter client (timeout, retries, cost), phase plan, vote parsing
    └─ storage.ts       SQLite through Drizzle ORM
 ```
@@ -112,10 +131,10 @@ server/            index, routes, orchestrator (+ tests), storage, static, vite
 shared/            schema.ts (Drizzle tables), defaults.ts (model IDs and limits used by both sides)
 script/i18n/       sources for the 15-language string table (python3 script/i18n/combine.py)
 benchmark/         questions, runner, report, model-ID check, raw results
-docs/              AUDIT.md, BENCHMARK.md, ENGINEERING_NOTES.md
+docs/              API.md, MCP.md, AUDIT.md, BENCHMARK.md, ENGINEERING_NOTES.md
 ```
 
-Useful commands: `npm run check` (types), `npm test` (unit tests for phase planning and vote parsing), `npm run build`.
+Useful commands: `npm run check` (types), `npm test` (unit tests for phase planning, vote parsing and the API), `npm run build`.
 
 ## API reference
 
@@ -138,6 +157,9 @@ Useful commands: `npm run check` (types), `npm test` (unit tests for phase plann
 | `PATCH` | `/api/sessions/:id/title`, `/api/sessions/:id/pin` | Rename or pin |
 | `DELETE` | `/api/sessions/:id`, `/api/sessions` | Delete one inquiry (and its debates) or all of yours |
 | `GET/POST/PUT/DELETE` | `/api/workflows` | Saved panel setups |
+| `POST/GET` | `/api/v1/debates`, `/api/v1/debates/:id`, `/api/v1/quick`, `/api/v1/workflows`, `/api/v1/panels`, `/api/v1/models` | Public API (see [docs/API.md](docs/API.md)) |
+| `POST` | `/mcp` | MCP server (see [docs/MCP.md](docs/MCP.md)) |
+| `POST` | `/api/workflows/seed` | Give the caller the two ready-made workflows, once |
 | `GET` | `/healthz` | Liveness check |
 | `WS` | `/ws?sessionId=:id` | Live stream for one session |
 
@@ -149,7 +171,7 @@ A request with an `X-Api-Key: sk-or-v1-…` header uses that key. Without it, th
 
 ## Known limitations
 
-- Self-hosted instances have no user accounts. Access control is the optional `MERCURY_PASSWORD`; saved keys are stored unencrypted.
+- Self-hosted instances have no user accounts. Access control is the optional `MERCURY_PASSWORD` for the web app and `MERCURY_API_TOKEN` for the API; saved keys are stored unencrypted.
 - The demo rate limit is in memory, per process, and resets on restart.
 - SQLite on a single machine; not designed for multiple instances.
 - A model that spends its whole output budget on hidden reasoning returns an empty answer; Mercury retries and then skips it for that round.
@@ -159,7 +181,7 @@ See [docs/AUDIT.md](docs/AUDIT.md) for the full list of what was checked and cha
 
 ## Changelog
 
-The latest release is **v3.8.0**: a code and claims audit, a real consensus mechanism, a public-demo privacy fix, refreshed models, a benchmark, and the remaining hard-coded English removed from the interface. See [CHANGELOG.md](CHANGELOG.md).
+The latest release is **v3.9.0**: a REST API and an MCP server so other agents can use Mercury as a debate organiser, two ready-made workflows per demo visitor, a workflow picker on the home screen, a short workflow tutorial, and a proofreading pass over the new translations. v3.8.0 was the audit release. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Author
 

@@ -48,7 +48,8 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
+      // Never log bodies of the public API: they can contain full answers.
+      if (capturedJsonResponse && !path.startsWith("/api/v1") && !path.startsWith("/api/keys")) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 

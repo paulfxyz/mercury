@@ -5,7 +5,7 @@ import { useTheme } from "@/App";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
-  GitBranch, Settings, Sun, Moon,
+  GitBranch, Settings, Sun, Moon, Plug,
   Plus, Clock, Menu, X, Pin,
 } from "lucide-react";
 import type { Session } from "@shared/schema";
@@ -96,6 +96,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Nav links */}
       <div className="px-2 space-y-0.5 flex-shrink-0">
         {navLink("/workflows", <GitBranch className="w-4 h-4" />, t("sidebar_workflows"))}
+        {navLink("/integrations", <Plug className="w-4 h-4" />, t("sidebar_integrations"))}
         {navLink("/settings", <Settings className="w-4 h-4" />, t("sidebar_settings"))}
       </div>
 

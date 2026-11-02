@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { ArrowUp, Loader2, ChevronRight } from "lucide-react";
-import type { Session } from "@shared/schema";
+import type { Session, Workflow } from "@shared/schema";
 
 export default function ChatPage() {
   const { t } = useI18n();
@@ -26,6 +26,10 @@ export default function ChatPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
+  const { data: workflows = [] } = useQuery<Workflow[]>({ queryKey: ["/api/workflows"] });
+  // Optional: run a saved workflow right after the quick answer. "" means "I'll choose afterwards".
+  const [workflowId, setWorkflowId] = useState("");
+  const chosenWorkflow = workflows.find(w => w.id === workflowId);
   const { data: sessions = [] } = useQuery<Session[]>({ queryKey: ["/api/sessions"], staleTime: 5_000 });
   const recentSessions = sessions.slice(0, 6);
 
@@ -51,7 +55,17 @@ export default function ChatPage() {
   const quickMutation = useMutation({
     mutationFn: async (q: string) => {
       const res = await apiRequest("POST", "/api/quick-answer", { query: q, title: q.slice(0, 60) });
-      return res.json() as Promise<{ sessionId: string }>;
+      const data = await res.json() as { sessionId: string };
+      if (chosenWorkflow) {
+        let steps: Array<{ modelId: string; systemPrompt?: string }> = [];
+        try { steps = JSON.parse(chosenWorkflow.steps); } catch { /* ignore */ }
+        await apiRequest("POST", `/api/sessions/${data.sessionId}/debate`, {
+          selectedModels: steps.map(s => s.modelId), roles: steps.map(s => s.systemPrompt ?? ""),
+          iterations: chosenWorkflow.iterations, temperature: chosenWorkflow.temperature,
+          consensusThreshold: chosenWorkflow.consensusThreshold, workflowId: chosenWorkflow.id,
+        });
+      }
+      return data;
     },
     onSuccess: (data) => {
       // Navigate immediately — session page handles the quick answer display,
@@ -124,6 +138,23 @@ export default function ChatPage() {
                   </Button>
                 </div>
               </div>
+
+              {/* Workflow picker: only useful when at least one workflow exists */}
+              {workflows.length > 0 && (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 -mt-2">
+                  <label htmlFor="workflow-picker" className="text-xs font-medium text-muted-foreground">{t("chat_workflow_label")}</label>
+                  <select
+                    id="workflow-picker" data-testid="select-workflow"
+                    value={workflowId} onChange={e => setWorkflowId(e.target.value)}
+                    className="flex-1 min-w-0 h-8 rounded-lg border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20">
+                    <option value="">{t("chat_workflow_later")}</option>
+                    {workflows.map(w => {
+                      let n = 0; try { n = JSON.parse(w.steps).length; } catch { /* ignore */ }
+                      return <option key={w.id} value={w.id}>{w.name} · {t("count_models_tmpl").replace("{n}", String(n))} · {t("count_rounds_tmpl").replace("{n}", String(w.iterations))}</option>;
+                    })}
+                  </select>
+                </div>
+              )}
 
               {/* Recent sessions */}
               {recentSessions.length > 0 && (

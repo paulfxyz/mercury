@@ -157,6 +157,8 @@ function WorkflowFormPanel({
 }) {
   const { toast } = useToast();
   const { t } = useI18n();
+  const [tutorialDismissed, setTutorialDismissed] = useState(() => { try { return localStorage.getItem("mercury_wf_tutorial") === "1"; } catch { return false; } });
+  function dismissTutorial() { setTutorialDismissed(true); try { localStorage.setItem("mercury_wf_tutorial", "1"); } catch { /* ignore */ } }
   const [name, setName] = useState(existing?.name ?? "");
   const [desc, setDesc] = useState(existing?.description ?? "");
   const [iters, setIters] = useState(existing?.iterations ?? 15);
@@ -209,6 +211,21 @@ function WorkflowFormPanel({
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        {/* Short tutorial, shown when creating a workflow until dismissed */}
+        {!existing && !tutorialDismissed && (
+          <div className="rounded-xl border border-border bg-muted/40 p-3.5 space-y-2" data-testid="workflow-tutorial">
+            <p className="text-xs font-semibold text-foreground">{t("wf_tutorial_title")}</p>
+            <ol className="space-y-1.5">
+              {(["wf_tutorial_1", "wf_tutorial_2", "wf_tutorial_3", "wf_tutorial_4"] as const).map((k, i) => (
+                <li key={k} className="flex gap-2 text-xs text-muted-foreground leading-relaxed">
+                  <span className="flex-shrink-0 w-4 h-4 mt-0.5 rounded-full bg-foreground text-background text-[10px] font-semibold flex items-center justify-center">{i + 1}</span>
+                  <span>{t(k)}</span>
+                </li>
+              ))}
+            </ol>
+            <button type="button" onClick={dismissTutorial} className="text-xs font-medium text-foreground underline underline-offset-2">{t("wf_tutorial_dismiss")}</button>
+          </div>
+        )}
         {/* Name */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-foreground">{t("wf_name")}</label>
