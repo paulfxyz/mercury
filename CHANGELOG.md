@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.9.2] — 2026-11-02
+
+Settings, Danger zone, "Delete all" is now a real kill switch.
+
+### Changed
+- It used to remove only inquiries and their results. It now erases everything stored by the instance: inquiries, debate results (including debates created through the API and MCP), workflows, saved API keys and settings. On the public demo it erases only the visitor's own data and any debates made through the API with the visitor's key.
+- After the erase the database file is compacted (`wal_checkpoint` and `VACUUM`) on self-hosted instances, so deleted rows are not left on disk.
+- The browser's memory, local storage, session storage and the in-memory session key are cleared and the app reloads to the start screen.
+- Debates that are still running when their session is erased now stop after the current round instead of writing results back.
+- The request is `DELETE /api/data` and needs the header `X-Confirm-Wipe: yes`.
+- The button, description, confirmation and messages are rewritten in all 15 languages.
+
+### Added
+- Tests for both erase modes and for the stop-on-erase behaviour (18 tests in total).
+
+---
+
 ## [3.9.1] — 2026-11-02
 
 Documentation and website only. No change to the API or the app's behaviour.

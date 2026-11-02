@@ -84,6 +84,8 @@ for (const col of [
 }
 
 // ─── Interface ───────────────────────────────────────────────
+export interface WipeCounts { sessions: number; iterations: number; workflows: number; apiKeys: number; settings: number }
+
 export interface IStorage {
   createSession(data: InsertSession): Session;
   getSession(id: string): Session | undefined;
@@ -92,6 +94,8 @@ export interface IStorage {
   updateSession(id: string, data: Partial<Session>): Session | undefined;
   deleteSession(id: string): void;
   deleteAllSessions(owner?: string): void;
+  /** Kill switch. Self-hosted (no owners): erases every table and compacts the file. Demo: erases only the given owners' data. */
+  wipeEverything(owners?: string[]): WipeCounts;
   updateSessionTitle(id: string, title: string): Session | undefined;
   setPinned(id: string, pinned: boolean): Session | undefined;
   appendFollowUp(id: string, query: string, answer: string): Session | undefined;
@@ -155,6 +159,30 @@ export const storage: IStorage = {
       db.delete(iterations).where(eq(iterations.sessionId, s.id)).run();
       db.delete(sessions).where(eq(sessions.id, s.id)).run();
     }
+  },
+  wipeEverything(owners) {
+    const n = (sql: string, ...args: unknown[]) => (sqlite.prepare(sql).run(...args).changes as number);
+    const counts: WipeCounts = { sessions: 0, iterations: 0, workflows: 0, apiKeys: 0, settings: 0 };
+    if (owners === undefined) {
+      // Self-hosted: everything goes, including API-created debates, saved keys and settings.
+      sqlite.transaction(() => {
+        counts.iterations = n("DELETE FROM iterations");
+        counts.sessions = n("DELETE FROM sessions");
+        counts.workflows = n("DELETE FROM workflows");
+        counts.apiKeys = n("DELETE FROM api_keys");
+        counts.settings = n("DELETE FROM settings");
+      })();
+      try { sqlite.pragma("wal_checkpoint(TRUNCATE)"); sqlite.exec("VACUUM"); } catch { /* best effort */ }
+      return counts;
+    }
+    if (owners.length === 0) return counts;
+    const marks = owners.map(() => "?").join(",");
+    sqlite.transaction(() => {
+      counts.iterations = n(`DELETE FROM iterations WHERE session_id IN (SELECT id FROM sessions WHERE owner IN (${marks}))`, ...owners);
+      counts.sessions = n(`DELETE FROM sessions WHERE owner IN (${marks})`, ...owners);
+      counts.workflows = n(`DELETE FROM workflows WHERE owner IN (${marks})`, ...owners);
+    })();
+    return counts;
   },
   updateSessionTitle(id, title) {
     db.update(sessions).set({ title } as any).where(eq(sessions.id, id)).run();

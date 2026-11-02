@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import type { Server } from "http";
-import { randomUUID, timingSafeEqual } from "crypto";
+import { randomUUID, timingSafeEqual, createHash } from "crypto";
 import { WebSocketServer } from "ws";
 import { storage } from "./storage";
 import {
@@ -262,6 +262,22 @@ export function registerRoutes(httpServer: Server, app: Express) {
   });
 
   app.delete("/api/sessions", (req, res) => { storage.deleteAllSessions(scope(req, res)); res.json({ success: true }); });
+  // Kill switch: erases every inquiry, debate result, workflow, saved key and setting.
+  // Self-hosted: the whole database. Demo: only this visitor's data (and debates made through the API with the same key).
+  app.delete("/api/data", (req, res) => {
+    if (req.headers["x-confirm-wipe"] !== "yes") return res.status(400).json({ error: "Confirmation is required to erase all data." });
+    let owners: string[] | undefined;
+    if (DEMO) {
+      owners = [ownerOf(req, res)];
+      const raw = req.headers["x-api-key"] ?? req.headers["x-openrouter-key"];
+      const key = (Array.isArray(raw) ? raw[0] : raw)?.trim();
+      if (key) owners.push("api:" + createHash("sha256").update(key).digest("hex").slice(0, 32));
+    }
+    const deleted = storage.wipeEverything(owners);
+    if (!DEMO) sessionClients.clear();
+    res.json({ success: true, deleted });
+  });
+
   app.delete("/api/sessions/:id", (req, res) => {
     if (loadSession(req, res)) storage.deleteSession(pid(req));
     res.json({ success: true });

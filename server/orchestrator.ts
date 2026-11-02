@@ -259,6 +259,9 @@ function clip(text: string, max: number): string {
 
 // ─── Debate orchestration ────────────────────────────────────
 
+/** Thrown when a session was erased while its debate was running; the run stops and writes nothing more. */
+export class RunCancelled extends Error { constructor() { super("The inquiry was deleted while it was running."); } }
+
 export async function runOrchestration(
   sessionId: string,
   query: string,
@@ -289,6 +292,7 @@ export async function runOrchestration(
   };
 
   for (let i = 0; i < plan.length; i++) {
+    if (!storage.getSession(sessionId)) throw new RunCancelled();
     const phaseType = plan[i];
     const phase = PHASE_PROMPTS[phaseType];
     storage.updateSession(sessionId, { totalIterations: total });
@@ -322,6 +326,7 @@ export async function runOrchestration(
     };
 
     const results = await Promise.all(speakers.map(run));
+    if (!storage.getSession(sessionId)) throw new RunCancelled();
     const ok = results.filter(r => !r.failed);
 
     if (ok.length === 0) {

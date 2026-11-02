@@ -127,12 +127,17 @@ export default function SettingsPage() {
     },
   });
 
+  // Kill switch: erases the whole server-side dataset, then wipes everything held in this browser and reloads.
   const clearSessionsMutation = useMutation({
-    mutationFn: () => apiRequest("DELETE", "/api/sessions"),
+    mutationFn: () => apiRequest("DELETE", "/api/data", undefined, { "X-Confirm-Wipe": "yes" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      setSessionKey(null);
+      queryClient.clear();
+      try { localStorage.clear(); sessionStorage.clear(); } catch { /* ignore */ }
       toast({ title: t("toast_history_deleted_title"), description: t("toast_history_deleted_desc") });
+      setTimeout(() => { window.location.hash = "#/"; window.location.reload(); }, 1500);
     },
+    onError: () => toast({ title: t("toast_wipe_error"), variant: "destructive" }),
   });
 
   const savedKeys = keysData?.keys ?? [];

@@ -20,12 +20,13 @@ function sessionHeaders(): Record<string, string> {
   return _sessionKey ? { "X-Api-Key": _sessionKey } : {};
 }
 
-export async function apiRequest(method: string, url: string, data?: unknown): Promise<Response> {
+export async function apiRequest(method: string, url: string, data?: unknown, extraHeaders?: Record<string, string>): Promise<Response> {
   const res = await fetch(toRelative(url), {
     method,
     headers: {
       ...(data ? { "Content-Type": "application/json" } : {}),
       ...sessionHeaders(),
+      ...(extraHeaders ?? {}),
     },
     body: data ? JSON.stringify(data) : undefined,
   });

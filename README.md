@@ -5,7 +5,7 @@
 **Ask once. Get an instant answer. Then, if it matters, let a panel of AI models research, debate and vote.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-3.9.1-brightgreen?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-3.9.2-brightgreen?style=for-the-badge)](CHANGELOG.md)
 [![Built with TypeScript](https://img.shields.io/badge/Built%20with-TypeScript-3178c6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Powered by OpenRouter](https://img.shields.io/badge/Powered%20by-OpenRouter-6c47ff?style=for-the-badge)](https://openrouter.ai)
 
@@ -93,6 +93,10 @@ Mercury has two ways to hold your OpenRouter key:
 
 - **This session only.** The key lives in the browser tab's memory and is sent in an `X-Api-Key` header with each request. The server uses it for that request and does not store it.
 - **Save on server.** The key is stored in the SQLite database in plain text, so anyone who can read the database file or reach an instance without a password can use it. This is fine on your own machine. For anything exposed, set `MERCURY_PASSWORD`, protect the volume, or use session-only keys.
+
+### Erasing everything
+
+Settings, Danger zone, Delete all data is a kill switch. On a self-hosted instance it empties the whole database: inquiries, debate results (including those created through the API or MCP), workflows, saved API keys and settings, then compacts the file so the deleted rows do not linger on disk. Debates that are still running stop and write nothing back. The browser's memory, local storage and session key are cleared too. On the public demo it erases only your own data and any debates made through the API with the same key. `MERCURY_API_TOKEN` and other environment variables are not stored in the database, so they are unaffected.
 
 ### Public demo mode
 
@@ -190,6 +194,7 @@ A request with an `X-Api-Key: sk-or-v1-…` header uses that key. Without it, th
 ## Known limitations
 
 - Self-hosted instances have no user accounts. Access control is the optional `MERCURY_PASSWORD` for the web app and `MERCURY_API_TOKEN` for the API; saved keys are stored unencrypted.
+- Delete all data cannot reach copies outside the database: backups, volume snapshots and the OpenRouter activity log are yours to remove. A model request already in flight when you erase finishes and is still billed; its result is discarded.
 - The demo rate limit is in memory, per process, and resets on restart.
 - SQLite on a single machine; not designed for multiple instances.
 - A model that spends its whole output budget on hidden reasoning returns an empty answer; Mercury retries and then skips it for that round.
@@ -199,7 +204,7 @@ See [docs/AUDIT.md](docs/AUDIT.md) for the full list of what was checked and cha
 
 ## Changelog
 
-The latest release is **v3.9.1**, which adds screenshots and an architecture diagram to this README. v3.9.0 added a REST API and an MCP server so other agents can use Mercury as a debate organiser, two ready-made workflows per demo visitor, a workflow picker on the home screen, a short workflow tutorial, and a proofreading pass over the new translations. v3.8.0 was the audit release. See [CHANGELOG.md](CHANGELOG.md).
+The latest release is **v3.9.2**, which turns "Delete all" in Settings into a full erase of the instance. v3.9.1 added screenshots and an architecture diagram to this README. v3.9.0 added a REST API and an MCP server so other agents can use Mercury as a debate organiser, two ready-made workflows per demo visitor, a workflow picker on the home screen, a short workflow tutorial, and a proofreading pass over the new translations. v3.8.0 was the audit release. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Author
 
