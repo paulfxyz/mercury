@@ -79,6 +79,7 @@ for (const col of [
   "ALTER TABLE sessions ADD COLUMN owner TEXT;",
   "ALTER TABLE sessions ADD COLUMN cost_usd REAL;",
   "ALTER TABLE workflows ADD COLUMN owner TEXT;",
+  "ALTER TABLE workflows ADD COLUMN seed_slug TEXT;",
 ]) {
   try { sqlite.exec(col); } catch { /* already exists */ }
 }

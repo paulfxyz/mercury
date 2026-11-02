@@ -48,7 +48,7 @@ export default function OnboardingPage() {
   function handleSessionOnly() {
     if (!key.trim()) return;
     setSessionKey(key.trim());
-    // Give this visitor the two ready-made workflows (once per visitor; the server ignores repeats).
+    // Every new session starts with the two ready-made workflows (the server only adds whichever is missing).
     apiRequest("POST", "/api/workflows/seed", { lang }).then(() => queryClient.invalidateQueries({ queryKey: ["/api/workflows"] })).catch(() => {});
     toast({ title: t("toast_session_key_title"), description: t("toast_session_key_desc") });
     navigate("/chat");

@@ -5,7 +5,7 @@
 **Ask once. Get an instant answer. Then, if it matters, let a panel of AI models research, debate and vote.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-3.9.2-brightgreen?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-3.9.3-brightgreen?style=for-the-badge)](CHANGELOG.md)
 [![Built with TypeScript](https://img.shields.io/badge/Built%20with-TypeScript-3178c6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Powered by OpenRouter](https://img.shields.io/badge/Powered%20by-OpenRouter-6c47ff?style=for-the-badge)](https://openrouter.ai)
 
@@ -96,7 +96,7 @@ Mercury has two ways to hold your OpenRouter key:
 
 ### Erasing everything
 
-Settings, Danger zone, Delete all data is a kill switch. On a self-hosted instance it empties the whole database: inquiries, debate results (including those created through the API or MCP), workflows, saved API keys and settings, then compacts the file so the deleted rows do not linger on disk. Debates that are still running stop and write nothing back. The browser's memory, local storage and session key are cleared too. On the public demo it erases only your own data and any debates made through the API with the same key. `MERCURY_API_TOKEN` and other environment variables are not stored in the database, so they are unaffected.
+Settings, Danger zone, Delete all data is a kill switch. On a self-hosted instance it empties the whole database: inquiries, debate results (including those created through the API or MCP), workflows, saved API keys and settings, then compacts the file so the deleted rows do not linger on disk. Debates that are still running stop and write nothing back. The browser's memory, local storage and session key are cleared too. On the public demo it erases only your own data and any debates made through the API with the same key, and the two ready-made workflows are put back straight away. `MERCURY_API_TOKEN` and other environment variables are not stored in the database, so they are unaffected.
 
 ### Public demo mode
 
@@ -204,7 +204,7 @@ See [docs/AUDIT.md](docs/AUDIT.md) for the full list of what was checked and cha
 
 ## Changelog
 
-The latest release is **v3.9.2**, which turns "Delete all" in Settings into a full erase of the instance. v3.9.1 added screenshots and an architecture diagram to this README. v3.9.0 added a REST API and an MCP server so other agents can use Mercury as a debate organiser, two ready-made workflows per demo visitor, a workflow picker on the home screen, a short workflow tutorial, and a proofreading pass over the new translations. v3.8.0 was the audit release. See [CHANGELOG.md](CHANGELOG.md).
+The latest release is **v3.9.3**, which makes sure every demo session starts with the two ready-made workflows, also after a reset. v3.9.2 turned "Delete all" in Settings into a full erase of the instance. v3.9.1 added screenshots and an architecture diagram to this README. v3.9.0 added a REST API and an MCP server so other agents can use Mercury as a debate organiser, two ready-made workflows per demo visitor, a workflow picker on the home screen, a short workflow tutorial, and a proofreading pass over the new translations. v3.8.0 was the audit release. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Author
 

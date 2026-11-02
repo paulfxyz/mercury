@@ -83,7 +83,7 @@ function AddKeyForm({ onDone }: { onDone: () => void }) {
 }
 
 export default function SettingsPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { theme, set: setTheme } = useTheme();
   const { sessionKey, setKey: setSessionKey } = useSessionKey();
   const { toast } = useToast();
@@ -129,7 +129,7 @@ export default function SettingsPage() {
 
   // Kill switch: erases the whole server-side dataset, then wipes everything held in this browser and reloads.
   const clearSessionsMutation = useMutation({
-    mutationFn: () => apiRequest("DELETE", "/api/data", undefined, { "X-Confirm-Wipe": "yes" }),
+    mutationFn: () => apiRequest("DELETE", `/api/data?lang=${encodeURIComponent(lang)}`, undefined, { "X-Confirm-Wipe": "yes" }),
     onSuccess: () => {
       setSessionKey(null);
       queryClient.clear();

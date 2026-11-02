@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.9.3] — 2026-11-02
+
+### Fixed
+- On the public demo, the two ready-made workflows did not come back after "Delete all data", because the demo remembered that it had already given them to that visitor. Every new demo session (every time a session key is entered) now adds whichever of the two is missing, and a reset puts them back immediately.
+- Workflows created by earlier versions are recognised by their models and are not duplicated.
+
+### Changed
+- Workflows have a `seed_slug` column that marks the two ready-made ones. Self-hosted instances still add them once and never again if the operator deleted them.
+- One more test (19 in total).
+
+---
+
 ## [3.9.2] — 2026-11-02
 
 Settings, Danger zone, "Delete all" is now a real kill switch.

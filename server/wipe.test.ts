@@ -43,3 +43,26 @@ test("a debate whose session was erased stops instead of writing data back", asy
   await assert.rejects(runOrchestration("missing-session", "q", ["a/b"], 3, "key", () => {}), RunCancelled);
   assert.equal(storage.getIterationsBySession("missing-session").length, 0);
 });
+
+test("demo visitors get both ready-made workflows in every new session, even after a reset", async () => {
+  const { ensureSeedWorkflows, seedWorkflows } = await import("./seed");
+  const owner = "visitor-seed";
+  assert.equal(ensureSeedWorkflows(owner, "fr"), 2);
+  assert.equal(ensureSeedWorkflows(owner, "fr"), 0);            // no duplicates on repeat
+  const slugs = () => storage.listWorkflows(owner).map(w => w.seedSlug).sort();
+  assert.deepEqual(slugs(), ["budget", "precision"]);
+  // The visitor deletes one and enters a key again: it comes back.
+  storage.deleteWorkflow(storage.listWorkflows(owner).find(w => w.seedSlug === "budget")!.id);
+  assert.equal(seedWorkflows(owner, "en"), true);
+  assert.deepEqual(slugs(), ["budget", "precision"]);
+  // After a full reset they are there again.
+  storage.wipeEverything([owner]);
+  assert.equal(storage.listWorkflows(owner).length, 0);
+  assert.equal(seedWorkflows(owner, "en"), true);
+  assert.deepEqual(slugs(), ["budget", "precision"]);
+  // Workflows created before the marker existed are recognised, not duplicated.
+  const old = storage.listWorkflows(owner)[0];
+  storage.updateWorkflow(old.id, { seedSlug: null } as any);
+  assert.equal(ensureSeedWorkflows(owner), 0);
+  assert.equal(storage.listWorkflows(owner).length, 2);
+});

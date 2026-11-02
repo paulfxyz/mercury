@@ -11,7 +11,7 @@ import { DEMO, PASSWORD, DEMO_LIMITS, limits, rateLimited, num, parseDebateConfi
 import { sessionClients, broadcast, runInBackground } from "./debates";
 import { registerApiRoutes } from "./api";
 import { registerMcp } from "./mcp";
-import { seedWorkflows } from "./seed";
+import { seedWorkflows, ensureSeedWorkflows } from "./seed";
 
 // ─── Small helpers ───────────────────────────────────────────
 const COOKIE = "mercury_owner";
@@ -195,7 +195,8 @@ export function registerRoutes(httpServer: Server, app: Express) {
   });
 
   // ─── Workflows ─────────────────────────────────────────────
-  // Gives the caller the two ready-made workflows, once (called by the client after a key is entered).
+  // Gives the caller the two ready-made workflows. Demo: every time a session key is entered, filling in whichever is missing.
+  // Self-hosted: once.
   app.post("/api/workflows/seed", (req, res) => {
     const lang = typeof req.body?.lang === "string" ? req.body.lang.slice(0, 8) : "en";
     const created = seedWorkflows(DEMO ? ownerOf(req, res) : null, lang);
@@ -275,6 +276,8 @@ export function registerRoutes(httpServer: Server, app: Express) {
     }
     const deleted = storage.wipeEverything(owners);
     if (!DEMO) sessionClients.clear();
+    // A reset demo visitor starts again with the two ready-made workflows.
+    else if (owners) ensureSeedWorkflows(owners[0], typeof req.query.lang === "string" ? req.query.lang.slice(0, 8) : "en");
     res.json({ success: true, deleted });
   });
 

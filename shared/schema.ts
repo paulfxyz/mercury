@@ -74,6 +74,7 @@ export const workflows = sqliteTable("workflows", {
   consensusThreshold: real("consensus_threshold").notNull().default(0.7), // 0-1
   isDefault: integer("is_default").notNull().default(0),
   owner: text("owner"),
+  seedSlug: text("seed_slug"), // set on the ready-made workflows ("precision", "budget")
   createdAt: integer("created_at").notNull(),
 });
 export const insertWorkflowSchema = createInsertSchema(workflows).omit({ id: true, createdAt: true });

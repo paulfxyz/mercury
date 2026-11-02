@@ -26,7 +26,7 @@ export const LIMITS = {
 } as const;
 
 /** Current Mercury version. `npm test` checks that it matches package.json. */
-export const VERSION = "3.9.2";
+export const VERSION = "3.9.3";
 
 /** Suggested debate panels (shown in the wizard and listed by the API). Model IDs are verified by benchmark/verify_models.py. */
 export const PANELS: Array<{ id: string; models: string[] }> = [
